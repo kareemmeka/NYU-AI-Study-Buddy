@@ -1,6 +1,7 @@
 import { Portkey } from 'portkey-ai';
 
 // Lazy initialization to avoid errors during build time
+// Only initialize when actually needed (at runtime, not build time)
 let portkeyInstance: Portkey | null = null;
 
 function getPortkey(): Portkey {
@@ -17,22 +18,17 @@ function getPortkey(): Portkey {
   return portkeyInstance;
 }
 
-// Export a function that returns portkey instance (lazy initialization)
+// Export a function that returns portkey instance (fully lazy - only called at runtime)
 export function getPortkeyClient(): Portkey {
   return getPortkey();
 }
 
-// For backward compatibility, export portkey as a proxy
-export const portkey = new Proxy({} as Portkey, {
-  get(_target, prop) {
-    const instance = getPortkey();
-    const value = instance[prop as keyof Portkey];
-    if (typeof value === 'function') {
-      return value.bind(instance);
-    }
-    return value;
+// Export portkey for backward compatibility - but use getPortkeyClient() in API routes
+export const portkey = {
+  get chat() {
+    return getPortkey().chat;
   },
-});
+} as Portkey;
 
 // Model configuration - can be overridden via environment variable
 export const AI_MODEL = process.env.AI_MODEL || '@gpt-4o/gpt-4o';
