@@ -18,10 +18,24 @@ function getPortkey(): Portkey {
       hasApiKey: !!apiKey,
     });
     
-    portkeyInstance = new Portkey({
+    // Portkey SDK configuration
+    // For NYU gateway, we need to use the baseURL
+    const config: any = {
       apiKey: apiKey,
-      ...(baseURL && { baseURL }), // Only add baseURL if it's set
+    };
+    
+    // Add baseURL if provided (for custom gateways like NYU)
+    if (baseURL) {
+      config.baseURL = baseURL;
+    }
+    
+    console.log('Portkey config:', {
+      hasApiKey: !!config.apiKey,
+      baseURL: config.baseURL,
+      apiKeyPrefix: config.apiKey?.substring(0, 10),
     });
+    
+    portkeyInstance = new Portkey(config);
   }
   return portkeyInstance;
 }
