@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { portkey, SYSTEM_PROMPT } from '@/lib/portkey';
+import { portkey, SYSTEM_PROMPT, AI_MODEL } from '@/lib/portkey';
 import { listFiles } from '@/lib/storage';
 import { extractTextFromFile } from '@/lib/file-extractors';
 import { ChatRequest, Message } from '@/types';
@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         try {
           const response = await portkey.chat.completions.create({
-            model: '@gpt-4o/gpt-4o', // NYU virtual key format
+            model: AI_MODEL, // Configurable via AI_MODEL environment variable
             messages: messages as any,
             max_tokens: 1500,
             temperature: 0.3,

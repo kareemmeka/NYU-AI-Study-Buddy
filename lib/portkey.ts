@@ -10,6 +10,9 @@ export const portkey = new Portkey({
   apiKey: process.env.PORTKEY_API_KEY,
 });
 
+// Model configuration - can be overridden via environment variable
+export const AI_MODEL = process.env.AI_MODEL || '@gpt-4o/gpt-4o';
+
 export const SYSTEM_PROMPT = `You are an AI Study Buddy for NYU Abu Dhabi's CPE (Computer Engineering) course taught by Professor Mohamed Eid.
 
 Your role:
