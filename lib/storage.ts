@@ -33,14 +33,27 @@ export async function listFiles(): Promise<FileMetadata[]> {
     token: process.env.BLOB_READ_WRITE_TOKEN,
   });
 
-  return blobs.map(blob => ({
-    id: blob.pathname,
-    name: blob.pathname.split('/').pop() || 'unknown',
-    type: blob.contentType || 'unknown',
-    size: blob.size,
-    uploadedAt: blob.uploadedAt ? new Date(blob.uploadedAt) : new Date(),
-    url: blob.url,
-  }));
+  return blobs.map(blob => {
+    // Extract file type from filename extension
+    const filename = blob.pathname.split('/').pop() || 'unknown';
+    const extension = filename.split('.').pop()?.toLowerCase() || '';
+    const contentTypeMap: Record<string, string> = {
+      'pdf': 'application/pdf',
+      'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'txt': 'text/plain',
+    };
+
+    return {
+      id: blob.pathname,
+      name: filename,
+      type: contentTypeMap[extension] || 'unknown',
+      size: blob.size,
+      uploadedAt: new Date(), // Use current date as fallback
+      url: blob.url,
+    };
+  });
 }
 
 export async function deleteFile(fileId: string): Promise<void> {
