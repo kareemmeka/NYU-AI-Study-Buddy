@@ -11,7 +11,11 @@ export const metadata: Metadata = {
   description: "An AI-powered study assistant for NYU Abu Dhabi's CPE course. Upload course materials and get instant answers to your questions.",
   keywords: ["AI", "Study Buddy", "CPE", "NYU Abu Dhabi", "Education", "Chatbot"],
   authors: [{ name: "NYU Abu Dhabi" }],
-  viewport: "width=device-width, initial-scale=1",
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
