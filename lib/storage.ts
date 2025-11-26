@@ -8,9 +8,14 @@ export async function uploadFile(file: File): Promise<FileMetadata> {
     throw new Error(`File size exceeds maximum of ${MAX_FILE_SIZE / 1024 / 1024}MB`);
   }
 
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token) {
+    throw new Error('BLOB_READ_WRITE_TOKEN is not set. Please configure Vercel Blob storage in your Vercel project settings.');
+  }
+
   const blob = await put(file.name, file, {
     access: 'public',
-    token: process.env.BLOB_READ_WRITE_TOKEN,
+    token: token,
   });
 
   return {
@@ -29,8 +34,14 @@ export async function uploadFiles(files: File[]): Promise<FileMetadata[]> {
 }
 
 export async function listFiles(): Promise<FileMetadata[]> {
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token) {
+    console.warn('BLOB_READ_WRITE_TOKEN not set, returning empty file list');
+    return [];
+  }
+
   const { blobs } = await list({
-    token: process.env.BLOB_READ_WRITE_TOKEN,
+    token: token,
   });
 
   return blobs.map(blob => {
@@ -57,8 +68,13 @@ export async function listFiles(): Promise<FileMetadata[]> {
 }
 
 export async function deleteFile(fileId: string): Promise<void> {
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token) {
+    throw new Error('BLOB_READ_WRITE_TOKEN is not set. Please configure Vercel Blob storage.');
+  }
+
   await del(fileId, {
-    token: process.env.BLOB_READ_WRITE_TOKEN,
+    token: token,
   });
 }
 
