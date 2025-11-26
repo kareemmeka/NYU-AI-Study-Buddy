@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Message as MessageType } from '@/types';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
@@ -12,19 +12,7 @@ export function ChatInterface() {
   const [isTyping, setIsTyping] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<MessageType[]>([]);
 
-  useEffect(() => {
-    const handleExampleQuestion = (e: CustomEvent) => {
-      handleSend(e.detail);
-    };
-
-    window.addEventListener('example-question' as any, handleExampleQuestion);
-    return () => {
-      window.removeEventListener('example-question' as any, handleExampleQuestion);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // handleSend is stable, no need to include in deps
-
-  const handleSend = async (message: string) => {
+  const handleSend = useCallback(async (message: string) => {
     if (!message.trim()) return;
 
     const userMessage: MessageType = {
@@ -128,7 +116,21 @@ export function ChatInterface() {
       };
       setMessages((prev) => [...prev, errorMsg]);
     }
-  };
+  }, [conversationHistory]);
+
+  useEffect(() => {
+    // Only add event listener on client side
+    if (typeof window === 'undefined') return;
+
+    const handleExampleQuestion = (e: CustomEvent) => {
+      handleSend(e.detail);
+    };
+
+    window.addEventListener('example-question' as any, handleExampleQuestion);
+    return () => {
+      window.removeEventListener('example-question' as any, handleExampleQuestion);
+    };
+  }, [handleSend]);
 
   const handleClear = () => {
     setMessages([]);

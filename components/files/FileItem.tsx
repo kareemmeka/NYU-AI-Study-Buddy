@@ -41,7 +41,11 @@ export function FileItem({ file, onDelete }: FileItemProps) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => window.open(file.url, '_blank')}
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                window.open(file.url, '_blank');
+              }
+            }}
             className="h-8 w-8"
             aria-label="Download file"
           >

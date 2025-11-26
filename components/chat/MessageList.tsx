@@ -42,8 +42,10 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
                   key={idx}
                   className="text-left p-3 rounded-lg border bg-card hover:bg-accent transition-colors text-sm"
                   onClick={() => {
-                    const event = new CustomEvent('example-question', { detail: question });
-                    window.dispatchEvent(event);
+                    if (typeof window !== 'undefined') {
+                      const event = new CustomEvent('example-question', { detail: question });
+                      window.dispatchEvent(event);
+                    }
                   }}
                 >
                   {question}
