@@ -18,7 +18,7 @@ export async function uploadFile(file: File): Promise<FileMetadata> {
     name: file.name,
     type: file.type,
     size: file.size,
-    uploadedAt: new Date(blob.uploadedAt),
+    uploadedAt: new Date(), // Use current date since uploadedAt not available in PutBlobResult
     url: blob.url,
   };
 }
@@ -38,7 +38,7 @@ export async function listFiles(): Promise<FileMetadata[]> {
     name: blob.pathname.split('/').pop() || 'unknown',
     type: blob.contentType || 'unknown',
     size: blob.size,
-    uploadedAt: new Date(blob.uploadedAt),
+    uploadedAt: blob.uploadedAt ? new Date(blob.uploadedAt) : new Date(),
     url: blob.url,
   }));
 }

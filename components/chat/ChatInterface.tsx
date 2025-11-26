@@ -21,7 +21,8 @@ export function ChatInterface() {
     return () => {
       window.removeEventListener('example-question' as any, handleExampleQuestion);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // handleSend is stable, no need to include in deps
 
   const handleSend = async (message: string) => {
     if (!message.trim()) return;
