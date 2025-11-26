@@ -14,10 +14,30 @@ export async function uploadFile(file: File): Promise<FileMetadata> {
     throw new Error('BLOB_READ_WRITE_TOKEN is not set. Please add it to Vercel environment variables.');
   }
 
-  const blob = await put(file.name, file, {
-    access: 'public',
-    token: token,
-  });
+  // Log token info for debugging (first few chars only)
+  console.log('Using blob token:', token.substring(0, 20) + '...');
+
+  try {
+    const blob = await put(file.name, file, {
+      access: 'public',
+      token: token,
+    });
+    return {
+      id: blob.pathname,
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      uploadedAt: new Date(),
+      url: blob.url,
+    };
+  } catch (error) {
+    console.error('Vercel Blob upload error:', error);
+    if (error instanceof Error && error.message.includes('Access denied')) {
+      throw new Error('Blob storage access denied. Please verify BLOB_READ_WRITE_TOKEN is correct in Vercel environment variables. Token should start with "vercel_blob_rw_".');
+    }
+    throw error;
+  }
+}
 
   return {
     id: blob.pathname,
