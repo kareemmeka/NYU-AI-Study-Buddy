@@ -63,7 +63,18 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
         body: formData,
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        // If response is not JSON, create error object
+        const text = await response.text().catch(() => 'Unknown error');
+        throw new Error(`Server error: ${response.status} ${response.statusText}. ${text}`);
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || `Upload failed: ${response.status} ${response.statusText}`);
+      }
 
       if (data.success) {
         toast({
@@ -77,9 +88,11 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
         throw new Error(data.error || 'Upload failed');
       }
     } catch (error) {
+      console.error('Upload error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: 'Upload failed',
-        description: error instanceof Error ? error.message : 'Unknown error',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
