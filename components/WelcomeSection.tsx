@@ -131,7 +131,7 @@ export function WelcomeSection({ onGetStarted }: WelcomeSectionProps) {
         <Button
           onClick={onGetStarted}
           size="lg"
-          className="bg-gradient-to-r from-purple-500 to-purple-400 hover:from-purple-600 hover:to-purple-500 text-white shadow-lg px-8 py-6 text-lg"
+          className="bg-purple-600 hover:bg-purple-700 text-white shadow-lg px-8 py-6 text-lg"
         >
           <Upload className="h-5 w-5 mr-2" />
           Upload Materials
@@ -144,7 +144,7 @@ export function WelcomeSection({ onGetStarted }: WelcomeSectionProps) {
             }
           }}
           size="lg"
-          className="bg-gradient-to-r from-purple-500 to-purple-400 hover:from-purple-600 hover:to-purple-500 text-white shadow-lg px-8 py-6 text-lg"
+          className="bg-purple-600 hover:bg-purple-700 text-white shadow-lg px-8 py-6 text-lg"
         >
           <MessageSquare className="h-5 w-5 mr-2" />
           Start Chatting
