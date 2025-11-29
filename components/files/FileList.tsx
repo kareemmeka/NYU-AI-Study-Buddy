@@ -7,6 +7,7 @@ import { FileUpload } from './FileUpload';
 import { Loader2, FolderOpen, MessageSquare, ArrowRight } from 'lucide-react';
 import { toast } from '@/components/ui/toast';
 import { formatFileSize } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 interface FileListProps {
   onFilesChange?: () => void;
