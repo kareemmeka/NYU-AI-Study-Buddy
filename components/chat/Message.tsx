@@ -34,7 +34,7 @@ export function Message({ message }: MessageProps) {
         className={cn(
           "max-w-[80%] rounded-xl px-5 py-4 shadow-md",
           isUser
-            ? "bg-purple-600 text-white"
+            ? "bg-[#57068C] text-white"
             : "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-purple-100 dark:border-purple-900"
         )}
       >

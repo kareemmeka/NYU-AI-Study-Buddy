@@ -100,7 +100,7 @@ export function FileList({ onFilesChange }: FileListProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold mb-2 text-purple-700 dark:text-purple-500">
+        <h2 className="text-3xl font-bold mb-2 text-[#57068C] dark:text-purple-400">
           Course Materials
         </h2>
         <p className="text-muted-foreground text-lg">
@@ -123,7 +123,7 @@ export function FileList({ onFilesChange }: FileListProps) {
                 window.dispatchEvent(event);
               }
             }}
-            className="bg-purple-600 hover:bg-purple-700 text-white"
+            className="bg-[#57068C] hover:bg-[#6A0BA8] text-white"
           >
             <MessageSquare className="h-4 w-4 mr-2" />
             Start Chatting

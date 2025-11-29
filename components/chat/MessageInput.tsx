@@ -58,7 +58,7 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
           onClick={handleSend}
           disabled={!message.trim() || disabled || message.length > maxLength}
           size="icon"
-          className="h-11 w-11 bg-purple-600 hover:bg-purple-700 text-white shadow-lg disabled:opacity-50"
+          className="h-11 w-11 bg-[#57068C] hover:bg-[#6A0BA8] text-white shadow-lg disabled:opacity-50"
         >
           <Send className="h-5 w-5" />
         </Button>
