@@ -20,8 +20,18 @@ export function FileList({ onFilesChange }: FileListProps) {
   const loadFiles = async () => {
     try {
       setLoading(true);
+      console.log('[FileList] Loading files...');
       const response = await fetch('/api/files');
+      
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error('[FileList] Failed to load files:', response.status, errorText);
+        throw new Error(`Failed to load files: ${response.status} ${response.statusText}`);
+      }
+      
       const data = await response.json();
+      console.log('[FileList] Files loaded:', data.files?.length || 0);
+      
       // Convert date strings back to Date objects
       const filesWithDates = (data.files || []).map((file: any) => ({
         ...file,
@@ -29,9 +39,11 @@ export function FileList({ onFilesChange }: FileListProps) {
       }));
       setFiles(filesWithDates);
     } catch (error) {
+      console.error('[FileList] Error loading files:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load files';
       toast({
         title: 'Error',
-        description: 'Failed to load files',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

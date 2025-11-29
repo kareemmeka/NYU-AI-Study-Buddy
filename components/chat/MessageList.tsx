@@ -16,26 +16,43 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
 
   useEffect(() => {
     // Scroll to bottom when messages change or typing indicator appears
-    if (scrollRef.current) {
-      // Use setTimeout to ensure DOM is updated
-      setTimeout(() => {
-        if (scrollRef.current) {
-          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
-      }, 0);
-    }
+    const scrollToBottom = () => {
+      if (scrollRef.current) {
+        const element = scrollRef.current;
+        // Use scrollIntoView for better compatibility
+        element.scrollTop = element.scrollHeight;
+      }
+    };
+    
+    // Multiple attempts to ensure scroll works
+    scrollToBottom();
+    const timeout1 = setTimeout(scrollToBottom, 50);
+    const timeout2 = setTimeout(scrollToBottom, 150);
+    const timeout3 = setTimeout(scrollToBottom, 300);
+    
+    return () => {
+      clearTimeout(timeout1);
+      clearTimeout(timeout2);
+      clearTimeout(timeout3);
+    };
   }, [messages, isTyping]);
 
   return (
     <div 
       className="flex-1 overflow-y-auto overflow-x-hidden px-4" 
       ref={scrollRef}
+      data-message-list
       style={{ 
+        height: '100%',
         maxHeight: '100%',
-        WebkitOverflowScrolling: 'touch' // Smooth scrolling on iOS
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
+        scrollBehavior: 'smooth',
+        position: 'relative'
       }}
     >
-      <div className="py-4 min-h-full">
+      <div className="py-4">
         {messages.length === 0 && !isTyping && (
           <div className="text-center py-8">
             <div className="max-w-3xl mx-auto space-y-6">

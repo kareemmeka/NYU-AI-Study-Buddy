@@ -1,9 +1,10 @@
 "use client";
 
 import { Button } from '@/components/ui/button';
-import { FolderOpen, Moon, Sun, HelpCircle, BookOpen } from 'lucide-react';
+import { FolderOpen, Moon, Sun, HelpCircle } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 interface HeaderProps {
   onFileManagerClick?: () => void;
@@ -23,8 +24,15 @@ export function Header({ onFileManagerClick, onHelpClick }: HeaderProps) {
       <div className="container flex h-20 items-center justify-between px-6">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-[#57068C] to-[#8B2FC9] flex items-center justify-center shadow-lg">
-              <BookOpen className="h-6 w-6 text-white" />
+            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-[#57068C] to-[#8B2FC9] flex items-center justify-center shadow-lg overflow-hidden">
+              <Image 
+                src="/nyu-logo.svg" 
+                alt="NYU Logo" 
+                width={40} 
+                height={40} 
+                className="object-contain"
+                priority
+              />
             </div>
             <div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-[#57068C] via-[#8B2FC9] to-[#57068C] bg-clip-text text-transparent">

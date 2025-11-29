@@ -90,8 +90,8 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          <div className="h-full flex flex-col max-w-5xl mx-auto w-full min-h-0">
-            <div className="flex-1 min-h-0 overflow-hidden p-6">
+          <div className="h-full flex flex-col max-w-5xl mx-auto w-full" style={{ height: '100%', minHeight: 0 }}>
+            <div className="flex-1 min-h-0 overflow-hidden p-6" style={{ height: '100%', minHeight: 0 }}>
               <ChatInterface />
             </div>
           </div>

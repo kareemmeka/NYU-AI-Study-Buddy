@@ -27,6 +27,9 @@ export function ChatInterface() {
     setIsTyping(true);
 
     try {
+      console.log('[ChatInterface] Sending message:', message.substring(0, 50) + '...');
+      console.log('[ChatInterface] Conversation history length:', conversationHistory.length);
+      
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -37,9 +40,20 @@ export function ChatInterface() {
           conversationHistory: conversationHistory.slice(-10),
         }),
       });
+      
+      console.log('[ChatInterface] Response status:', response.status, response.statusText);
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        console.error('[ChatInterface] Response not OK:', response.status, response.statusText);
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          const errorText = await response.text().catch(() => 'Unknown error');
+          console.error('[ChatInterface] Error response text:', errorText);
+          throw new Error(`HTTP ${response.status}: ${response.statusText}. ${errorText.substring(0, 200)}`);
+        }
+        console.error('[ChatInterface] Error data:', errorData);
         throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
@@ -84,6 +98,13 @@ export function ChatInterface() {
                     updated[updated.length - 1] = { ...assistantMessage };
                     return updated;
                   });
+                  // Trigger scroll after content update
+                  setTimeout(() => {
+                    const messageList = document.querySelector('[data-message-list]');
+                    if (messageList) {
+                      messageList.scrollTop = messageList.scrollHeight;
+                    }
+                  }, 50);
                 }
               } catch (e) {
                 if (e instanceof Error && e.message.includes('AI Error')) {
@@ -101,7 +122,13 @@ export function ChatInterface() {
       setConversationHistory((prev) => [...prev, assistantMessage]);
     } catch (error) {
       setIsTyping(false);
+      console.error('[ChatInterface] Error in handleSend:', error);
       const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      console.error('[ChatInterface] Error details:', {
+        message: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      
       toast({
         title: 'Error',
         description: errorMessage,
@@ -138,8 +165,8 @@ export function ChatInterface() {
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0">
-      <div className="flex-1 min-h-0 overflow-hidden">
+    <div className="flex flex-col h-full min-h-0" style={{ height: '100%' }}>
+      <div className="flex-1 min-h-0 overflow-hidden" style={{ minHeight: 0, height: '100%' }}>
         <MessageList messages={messages} isTyping={isTyping} />
       </div>
       <MessageInput onSend={handleSend} disabled={isTyping} />

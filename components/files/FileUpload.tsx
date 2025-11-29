@@ -49,19 +49,27 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
   };
 
   const handleUpload = async () => {
-    if (selectedFiles.length === 0) return;
+    if (selectedFiles.length === 0) {
+      console.warn('[FileUpload] No files selected');
+      return;
+    }
 
+    console.log('[FileUpload] Starting upload of', selectedFiles.length, 'file(s)');
     setUploading(true);
     const formData = new FormData();
-    selectedFiles.forEach((file) => {
+    selectedFiles.forEach((file, index) => {
+      console.log(`[FileUpload] Adding file ${index + 1}:`, file.name, formatFileSize(file.size));
       formData.append('files', file);
     });
 
     try {
+      console.log('[FileUpload] Sending request to /api/upload');
       const response = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
       });
+      
+      console.log('[FileUpload] Response status:', response.status, response.statusText);
 
       let data;
       try {
@@ -77,6 +85,7 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
       }
 
       if (data.success) {
+        console.log('[FileUpload] Upload successful:', data.files?.length || 0, 'files');
         // Convert date strings to Date objects
         const filesWithDates = (data.files || []).map((file: any) => ({
           ...file,
@@ -91,6 +100,7 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
         setSelectedFiles([]);
         onUploadComplete?.();
       } else {
+        console.error('[FileUpload] Upload failed:', data.error);
         throw new Error(data.error || 'Upload failed');
       }
     } catch (error) {
