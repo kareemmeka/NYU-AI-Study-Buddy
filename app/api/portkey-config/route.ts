@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Prevent this route from being pre-rendered during build
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 // This endpoint shows the EXACT configuration being used for Portkey
 // Use this to verify your API key and model are correct
 export async function GET(req: NextRequest) {

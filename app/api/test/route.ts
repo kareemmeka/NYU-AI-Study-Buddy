@@ -1,6 +1,10 @@
 import { NextRequest } from 'next/server';
 import { getPortkeyClient, AI_MODEL } from '@/lib/portkey';
 
+// Prevent this route from being pre-rendered during build
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 export async function GET() {
   try {
     console.log('Testing Portkey connection...');

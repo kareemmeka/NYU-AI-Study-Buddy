@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 export async function GET(req: NextRequest) {
   // Check exact values to verify they match expected
   const portkeyKey = process.env.PORTKEY_API_KEY;
