@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
           
           try {
             // Try using Portkey SDK first
-            const portkey = getPortkeyClient();
+            const portkey = await getPortkeyClient();
             console.log('Portkey client initialized, making API call via SDK...');
             
             response = await portkey.chat.completions.create({

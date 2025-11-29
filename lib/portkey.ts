@@ -1,10 +1,25 @@
-import { Portkey } from 'portkey-ai';
+// Dynamic import to avoid build-time errors
+// Only import Portkey when actually needed at runtime
+let PortkeyClass: any = null;
+let portkeyInstance: any = null;
 
-// Lazy initialization to avoid errors during build time
-// Only initialize when actually needed (at runtime, not build time)
-let portkeyInstance: Portkey | null = null;
+async function loadPortkeySDK() {
+  if (!PortkeyClass) {
+    try {
+      const portkeyModule = await import('portkey-ai');
+      PortkeyClass = portkeyModule.Portkey || portkeyModule.default;
+      if (!PortkeyClass) {
+        throw new Error('Portkey class not found in portkey-ai module');
+      }
+    } catch (error) {
+      console.error('Failed to load portkey-ai module:', error);
+      throw new Error(`Failed to load Portkey SDK: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  return PortkeyClass;
+}
 
-function getPortkey(): Portkey {
+async function getPortkey(): Promise<any> {
   if (!portkeyInstance) {
     const apiKey = process.env.PORTKEY_API_KEY;
     if (!apiKey) {
@@ -12,6 +27,9 @@ function getPortkey(): Portkey {
     }
     
     const baseURL = process.env.PORTKEY_BASE_URL || "https://ai-gateway.apps.cloud.rt.nyu.edu/v1";
+    
+    // Load Portkey SDK dynamically
+    const Portkey = await loadPortkeySDK();
     
     // Portkey SDK configuration
     // For NYU gateway, we need to use the baseURL
@@ -42,8 +60,9 @@ function getPortkey(): Portkey {
 }
 
 // Export a function that returns portkey instance (fully lazy - only called at runtime)
-export function getPortkeyClient(): Portkey {
-  return getPortkey();
+// Now async to support dynamic import
+export async function getPortkeyClient(): Promise<any> {
+  return await getPortkey();
 }
 
 // Direct fetch function as fallback if Portkey SDK doesn't work

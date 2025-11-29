@@ -8,7 +8,7 @@ export async function GET() {
     console.log('PORTKEY_API_KEY exists:', !!process.env.PORTKEY_API_KEY);
     console.log('PORTKEY_BASE_URL:', process.env.PORTKEY_BASE_URL);
 
-    const portkey = getPortkeyClient();
+    const portkey = await getPortkeyClient();
     
     // Test with same configuration as Python example
     const response = await portkey.chat.completions.create({
