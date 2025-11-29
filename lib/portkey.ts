@@ -26,7 +26,9 @@ async function getPortkey(): Promise<any> {
       throw new Error('PORTKEY_API_KEY is not set in environment variables');
     }
     
-    const baseURL = process.env.PORTKEY_BASE_URL || "https://ai-gateway.apps.cloud.rt.nyu.edu/v1";
+    // Use Portkey cloud by default (publicly accessible)
+    // Only use NYU gateway if explicitly set
+    const baseURL = process.env.PORTKEY_BASE_URL || undefined; // undefined = use Portkey cloud default
     
     // Load Portkey SDK dynamically
     const Portkey = await loadPortkeySDK();
@@ -92,7 +94,8 @@ export async function callPortkeyDirectly(
   stream: boolean = false
 ) {
   const apiKey = process.env.PORTKEY_API_KEY;
-  const baseURL = process.env.PORTKEY_BASE_URL || "https://ai-gateway.apps.cloud.rt.nyu.edu/v1";
+  // Use Portkey cloud by default (no baseURL = uses default Portkey cloud)
+  const baseURL = process.env.PORTKEY_BASE_URL || undefined;
   
   if (!apiKey) {
     throw new Error('PORTKEY_API_KEY is not set');

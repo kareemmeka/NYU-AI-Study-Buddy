@@ -160,7 +160,8 @@ export async function POST(req: NextRequest) {
               console.log('Portkey SDK returned 404, trying direct fetch to NYU gateway...');
               
               const apiKey = process.env.PORTKEY_API_KEY;
-              const baseURL = process.env.PORTKEY_BASE_URL || "https://ai-gateway.apps.cloud.rt.nyu.edu/v1";
+              // Use Portkey cloud by default
+              const baseURL = process.env.PORTKEY_BASE_URL || "https://api.portkey.ai/v1";
               const url = `${baseURL}/chat/completions`;
               
               console.log('Direct fetch URL:', url);
