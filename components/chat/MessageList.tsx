@@ -15,14 +15,27 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Scroll to bottom when messages change or typing indicator appears
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      // Use setTimeout to ensure DOM is updated
+      setTimeout(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+      }, 0);
     }
   }, [messages, isTyping]);
 
   return (
-    <div className="flex-1 px-4 overflow-auto" ref={scrollRef}>
-      <div className="py-4">
+    <div 
+      className="flex-1 overflow-y-auto overflow-x-hidden px-4" 
+      ref={scrollRef}
+      style={{ 
+        maxHeight: '100%',
+        WebkitOverflowScrolling: 'touch' // Smooth scrolling on iOS
+      }}
+    >
+      <div className="py-4 min-h-full">
         {messages.length === 0 && !isTyping && (
           <div className="text-center py-12">
             <h3 className="text-lg font-semibold mb-2">Welcome to AI Study Buddy!</h3>

@@ -7,9 +7,15 @@ import { ChatRequest, Message } from '@/types';
 const MAX_CONTEXT_LENGTH = 100000; // Limit context to avoid token limits
 
 async function loadCourseMaterials(): Promise<string> {
+  console.log('[MATERIALS] Loading course materials...');
+  const startTime = Date.now();
+  
   try {
     const files = await listFiles();
+    console.log(`[MATERIALS] Found ${files.length} files in storage`);
+    
     if (files.length === 0) {
+      console.log('[MATERIALS] No files found, returning empty message');
       return 'No course materials uploaded yet.';
     }
 
@@ -18,30 +24,61 @@ async function loadCourseMaterials(): Promise<string> {
 
     // Process files in parallel with limit
     const filesToProcess = files.slice(0, maxFilesToProcess);
-    const extractionPromises = filesToProcess.map(async (file) => {
+    console.log(`[MATERIALS] Processing ${filesToProcess.length} files...`);
+    
+    const extractionPromises = filesToProcess.map(async (file, index) => {
       try {
+        console.log(`[MATERIALS] Processing file ${index + 1}/${filesToProcess.length}: ${file.name}`);
+        const fetchStart = Date.now();
+        
         const response = await fetch(file.url, { 
           signal: AbortSignal.timeout(30000) // 30 second timeout per file
         });
-        const buffer = Buffer.from(await response.arrayBuffer());
-        const extracted = await extractTextFromFile(file.name, buffer);
-
-        if (extracted.text && !extracted.error) {
-          return `\n\n=== ${file.name} ===\n${extracted.text}`;
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
         }
-        return null;
+        
+        const buffer = Buffer.from(await response.arrayBuffer());
+        const fetchDuration = Date.now() - fetchStart;
+        console.log(`[MATERIALS] Fetched ${file.name} (${buffer.length} bytes) in ${fetchDuration}ms`);
+        
+        const extractStart = Date.now();
+        const extracted = await extractTextFromFile(file.name, buffer);
+        const extractDuration = Date.now() - extractStart;
+        
+        if (extracted.text && !extracted.error) {
+          console.log(`[MATERIALS] Extracted ${extracted.text.length} characters from ${file.name} in ${extractDuration}ms`);
+          return `\n\n=== ${file.name} ===\n${extracted.text}`;
+        } else {
+          console.warn(`[MATERIALS] Extraction failed for ${file.name}:`, extracted.error);
+          return null;
+        }
       } catch (error) {
-        console.error(`Error processing file ${file.name}:`, error);
+        console.error(`[MATERIALS] Error processing file ${file.name}:`, error);
+        console.error(`[MATERIALS] Error details:`, {
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
         return null;
       }
     });
 
     const results = await Promise.all(extractionPromises);
     materialTexts.push(...results.filter((r): r is string => r !== null));
+    
+    const totalDuration = Date.now() - startTime;
+    const totalText = materialTexts.join('\n');
+    console.log(`[MATERIALS] Loaded ${materialTexts.length} files, ${totalText.length} total characters in ${totalDuration}ms`);
 
-    return materialTexts.join('\n');
+    return totalText;
   } catch (error) {
-    console.error('Error loading course materials:', error);
+    const duration = Date.now() - startTime;
+    console.error(`[MATERIALS] Error loading course materials after ${duration}ms:`, error);
+    console.error('[MATERIALS] Error details:', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return 'Error loading course materials.';
   }
 }
@@ -83,11 +120,19 @@ function findRelevantSections(question: string, fullContext: string, maxLength: 
 }
 
 export async function POST(req: NextRequest) {
+  const startTime = Date.now();
+  const requestId = Math.random().toString(36).substring(7);
+  console.log(`[CHAT:${requestId}] Chat request received`);
+  
   try {
+    console.log(`[CHAT:${requestId}] Parsing request body...`);
     const body: ChatRequest = await req.json();
     const { message, conversationHistory = [] } = body;
 
+    console.log(`[CHAT:${requestId}] Message length: ${message?.length || 0}, History length: ${conversationHistory.length}`);
+
     if (!message || message.trim().length === 0) {
+      console.error(`[CHAT:${requestId}] Error: Empty message`);
       return new Response(JSON.stringify({ error: 'Message is required' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
@@ -95,8 +140,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Load course materials
+    console.log(`[CHAT:${requestId}] Loading course materials...`);
     const allMaterials = await loadCourseMaterials();
+    console.log(`[CHAT:${requestId}] Course materials loaded: ${allMaterials.length} characters`);
+    
     const context = findRelevantSections(message, allMaterials);
+    console.log(`[CHAT:${requestId}] Relevant context selected: ${context.length} characters`);
 
     // Build messages array
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
@@ -267,6 +316,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    console.log(`[CHAT:${requestId}] Streaming response initialized`);
     return new Response(stream, {
       headers: {
         'Content-Type': 'text/event-stream',
@@ -275,9 +325,19 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Chat API error:', error);
+    const duration = Date.now() - startTime;
+    console.error(`[CHAT:${requestId}] Error after ${duration}ms:`, error);
+    console.error(`[CHAT:${requestId}] Error details:`, {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined,
+    });
+    
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ 
+        error: 'Internal server error',
+        details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : undefined
+      }),
       {
         status: 500,
         headers: { 'Content-Type': 'application/json' },

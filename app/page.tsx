@@ -37,8 +37,8 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          <div className="h-full flex flex-col max-w-4xl mx-auto w-full">
-            <div className="flex-1 overflow-hidden p-4">
+          <div className="h-full flex flex-col max-w-4xl mx-auto w-full min-h-0">
+            <div className="flex-1 min-h-0 overflow-hidden p-4">
               <ChatInterface />
             </div>
           </div>
