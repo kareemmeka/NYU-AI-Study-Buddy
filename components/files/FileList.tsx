@@ -100,7 +100,7 @@ export function FileList({ onFilesChange }: FileListProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-[#57068C] to-[#8B2FC9] bg-clip-text text-transparent">
+        <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-purple-600 to-purple-500 bg-clip-text text-transparent">
           Course Materials
         </h2>
         <p className="text-muted-foreground text-lg">
@@ -123,7 +123,7 @@ export function FileList({ onFilesChange }: FileListProps) {
                 window.dispatchEvent(event);
               }
             }}
-            className="bg-gradient-to-r from-[#57068C] to-[#8B2FC9] hover:from-[#6A0BA8] hover:to-[#9D3FD9] text-white"
+            className="bg-gradient-to-r from-purple-500 to-purple-400 hover:from-purple-600 hover:to-purple-500 text-white"
           >
             <MessageSquare className="h-4 w-4 mr-2" />
             Start Chatting

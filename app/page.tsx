@@ -99,7 +99,7 @@ export default function Home() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
             <Card className="w-full max-w-4xl max-h-[90vh] overflow-auto bg-white dark:bg-gray-900 shadow-2xl">
               <div className="sticky top-0 bg-white dark:bg-gray-900 border-b p-6 flex items-center justify-between z-10">
-                <h2 className="text-3xl font-bold bg-gradient-to-r from-[#57068C] to-[#8B2FC9] bg-clip-text text-transparent">
+                <h2 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-purple-500 bg-clip-text text-transparent">
                   How It Works
                 </h2>
                 <Button
@@ -125,7 +125,7 @@ export default function Home() {
             <Card className="w-full max-w-4xl max-h-[90vh] overflow-auto bg-white dark:bg-gray-900 shadow-2xl">
               <div className="sticky top-0 bg-white dark:bg-gray-900 border-b p-6 flex items-center justify-between z-10">
                 <div>
-                  <h2 className="text-3xl font-bold bg-gradient-to-r from-[#57068C] to-[#8B2FC9] bg-clip-text text-transparent">
+                  <h2 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-purple-500 bg-clip-text text-transparent">
                     Course Materials
                   </h2>
                   <p className="text-muted-foreground mt-1 text-sm">

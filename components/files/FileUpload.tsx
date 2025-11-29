@@ -179,7 +179,7 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
           <Button
             onClick={handleUpload}
             disabled={uploading}
-            className="w-full mt-4 bg-gradient-to-r from-[#57068C] to-[#8B2FC9] hover:from-[#6A0BA8] hover:to-[#9D3FD9] text-white shadow-lg h-12 text-base font-semibold"
+            className="w-full mt-4 bg-gradient-to-r from-purple-500 to-purple-400 hover:from-purple-600 hover:to-purple-500 text-white shadow-lg h-12 text-base font-semibold"
           >
             {uploading ? (
               <>

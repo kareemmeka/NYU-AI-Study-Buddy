@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { FolderOpen, Moon, Sun, HelpCircle, MessageSquare, Upload } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
 
 interface HeaderProps {
   onFileManagerClick?: () => void;
@@ -26,18 +25,8 @@ export function Header({ onFileManagerClick, onHelpClick, onChatClick, onHomeCli
       <div className="container flex h-20 items-center justify-between px-6">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={onHomeClick}>
-            <div className="h-12 w-12 flex items-center justify-center overflow-hidden">
-              <Image 
-                src="/nyu-logo.svg" 
-                alt="NYU Logo" 
-                width={48} 
-                height={48} 
-                className="object-contain"
-                priority
-              />
-            </div>
             <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-[#57068C] via-[#8B2FC9] to-[#57068C] bg-clip-text text-transparent">
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-purple-500 to-purple-600 bg-clip-text text-transparent">
                 NYU AI Study Buddy
               </h1>
               <p className="text-xs text-muted-foreground font-medium">
