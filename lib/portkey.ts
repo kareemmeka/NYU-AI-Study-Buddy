@@ -49,10 +49,30 @@ async function getPortkey(): Promise<any> {
     });
     
     try {
+      // Portkey SDK might try to validate connection during initialization
+      // If it fails, we'll catch and provide better error message
       portkeyInstance = new Portkey(config);
       console.log('Portkey client created successfully');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create Portkey client:', error);
+      
+      // Check if it's a network/fetch error
+      if (error?.message?.includes('fetch failed') || error?.cause?.code === 'UND_ERR_CONNECT') {
+        throw new Error(
+          `Cannot connect to NYU gateway (${baseURL}). ` +
+          `This might mean: 1) Gateway requires VPN/network access, 2) Gateway URL is incorrect, ` +
+          `3) Gateway is temporarily unavailable. Error: ${error.message || 'Network connection failed'}`
+        );
+      }
+      
+      // Check if it's an API key error
+      if (error?.message?.includes('apiKey') || error?.message?.includes('API key')) {
+        throw new Error(
+          `Invalid Portkey API key. Please verify your PORTKEY_API_KEY in Vercel environment variables. ` +
+          `Get your key from: https://app.portkey.ai/api-keys`
+        );
+      }
+      
       throw error;
     }
   }

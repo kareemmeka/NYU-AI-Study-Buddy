@@ -141,9 +141,22 @@ export async function POST(req: NextRequest) {
             
             console.log('Portkey SDK call successful, starting stream...');
           } catch (sdkError: any) {
-            // If SDK fails with 404, try direct fetch
+            // If SDK fails, try direct fetch as fallback
             console.error('Portkey SDK error:', sdkError);
-            if (sdkError?.message?.includes('404') || sdkError?.status === 404 || sdkError?.message?.includes('not found')) {
+            console.error('SDK error details:', {
+              message: sdkError?.message,
+              cause: sdkError?.cause,
+              stack: sdkError?.stack,
+            });
+            
+            // Try direct fetch for any SDK error (not just 404)
+            // This bypasses the SDK initialization issues
+            if (sdkError?.message?.includes('fetch failed') || 
+                sdkError?.message?.includes('Cannot connect') ||
+                sdkError?.message?.includes('instantiate') ||
+                sdkError?.cause?.code === 'UND_ERR_CONNECT' ||
+                sdkError?.status === 404 || 
+                sdkError?.message?.includes('not found')) {
               console.log('Portkey SDK returned 404, trying direct fetch to NYU gateway...');
               
               const apiKey = process.env.PORTKEY_API_KEY;
