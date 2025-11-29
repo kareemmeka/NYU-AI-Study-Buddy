@@ -37,33 +37,41 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
     >
       <div className="py-4 min-h-full">
         {messages.length === 0 && !isTyping && (
-          <div className="text-center py-12">
-            <h3 className="text-lg font-semibold mb-2">Welcome to AI Study Buddy!</h3>
-            <p className="text-muted-foreground mb-6">
-              Upload your course materials and ask questions to get started.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl mx-auto">
-              {[
-                "When is Assignment 1 due?",
-                "Explain the concept from Lecture 3 in simple terms",
-                "Summarize the main topics from this week's slides",
-                "Generate 5 practice questions about computer architecture",
-                "What is the grading breakdown for this course?",
-                "Help me understand pointers in C++",
-              ].map((question, idx) => (
-                <button
-                  key={idx}
-                  className="text-left p-3 rounded-lg border bg-card hover:bg-accent transition-colors text-sm"
-                  onClick={() => {
-                    if (typeof window !== 'undefined') {
-                      const event = new CustomEvent('example-question', { detail: question });
-                      window.dispatchEvent(event);
-                    }
-                  }}
-                >
-                  {question}
-                </button>
-              ))}
+          <div className="text-center py-8">
+            <div className="max-w-3xl mx-auto space-y-6">
+              <div className="space-y-2">
+                <h3 className="text-2xl font-bold bg-gradient-to-r from-[#57068C] to-[#8B2FC9] bg-clip-text text-transparent">
+                  Ready to Get Started?
+                </h3>
+                <p className="text-muted-foreground">
+                  Ask a question about your course materials or try one of these examples:
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl mx-auto">
+                {[
+                  "What are the main topics covered in this course?",
+                  "Explain the key concepts from the latest lecture",
+                  "Summarize the important points from the syllabus",
+                  "Generate practice questions for the upcoming exam",
+                  "What is the grading breakdown for this course?",
+                  "Help me understand a difficult concept step by step",
+                ].map((question, idx) => (
+                  <button
+                    key={idx}
+                    className="text-left p-4 rounded-xl border-2 border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800 hover:border-[#57068C] hover:bg-purple-50 dark:hover:bg-purple-950/20 transition-all text-sm font-medium shadow-sm hover:shadow-md group"
+                    onClick={() => {
+                      if (typeof window !== 'undefined') {
+                        const event = new CustomEvent('example-question', { detail: question });
+                        window.dispatchEvent(event);
+                      }
+                    }}
+                  >
+                    <span className="group-hover:text-[#57068C] dark:group-hover:text-purple-400 transition-colors">
+                      {question}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}

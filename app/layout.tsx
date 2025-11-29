@@ -8,9 +8,9 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "AI Study Buddy - CPE Course Assistant",
-  description: "An AI-powered study assistant for NYU Abu Dhabi's CPE course. Upload course materials and get instant answers to your questions.",
-  keywords: ["AI", "Study Buddy", "CPE", "NYU Abu Dhabi", "Education", "Chatbot"],
+  title: "NYU AI Study Buddy - Your Intelligent Academic Assistant",
+  description: "AI-powered study assistant for all NYU Abu Dhabi courses. Upload course materials and get instant answers, explanations, and study support.",
+  keywords: ["NYU", "AI Study Buddy", "NYU Abu Dhabi", "Education", "Academic Assistant", "Study Helper", "AI Tutor"],
   authors: [{ name: "NYU Abu Dhabi" }],
 };
 

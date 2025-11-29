@@ -1,15 +1,16 @@
 "use client";
 
 import { Button } from '@/components/ui/button';
-import { FolderOpen, Moon, Sun } from 'lucide-react';
+import { FolderOpen, Moon, Sun, HelpCircle, BookOpen } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 
 interface HeaderProps {
   onFileManagerClick?: () => void;
+  onHelpClick?: () => void;
 }
 
-export function Header({ onFileManagerClick }: HeaderProps) {
+export function Header({ onFileManagerClick, onHelpClick }: HeaderProps) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -18,29 +19,49 @@ export function Header({ onFileManagerClick }: HeaderProps) {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center justify-between px-4">
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            AI Study Buddy
-          </h1>
-          <span className="text-xs text-muted-foreground hidden sm:inline">
-            CPE Course Assistant
-          </span>
+    <header className="sticky top-0 z-50 w-full border-b bg-white/95 dark:bg-gray-900/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/80 dark:supports-[backdrop-filter]:bg-gray-900/80 shadow-sm">
+      <div className="container flex h-20 items-center justify-between px-6">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-[#57068C] to-[#8B2FC9] flex items-center justify-center shadow-lg">
+              <BookOpen className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-[#57068C] via-[#8B2FC9] to-[#57068C] bg-clip-text text-transparent">
+                NYU AI Study Buddy
+              </h1>
+              <p className="text-xs text-muted-foreground font-medium">
+                Your Intelligent Academic Assistant
+              </p>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <Button
             variant="ghost"
-            size="icon"
+            size="sm"
+            onClick={onHelpClick}
+            className="hidden sm:flex items-center gap-2 text-muted-foreground hover:text-foreground"
+            aria-label="Help & Instructions"
+          >
+            <HelpCircle className="h-4 w-4" />
+            <span className="hidden md:inline">How It Works</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={onFileManagerClick}
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
             aria-label="File Manager"
           >
-            <FolderOpen className="h-5 w-5" />
+            <FolderOpen className="h-4 w-4" />
+            <span className="hidden md:inline">Materials</span>
           </Button>
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="text-muted-foreground hover:text-foreground"
             aria-label="Toggle theme"
           >
             {mounted && theme === 'dark' ? (

@@ -108,26 +108,32 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
 
   return (
     <div className="space-y-4">
-      <Card className="p-6">
+      <Card className="p-6 border-2 border-purple-200 dark:border-purple-800 bg-gradient-to-br from-purple-50/50 to-blue-50/50 dark:from-purple-950/20 dark:to-blue-950/20">
         <div
           {...getRootProps()}
           className={`
-            border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
-            transition-colors
-            ${isDragActive ? 'border-primary bg-primary/5' : 'border-gray-300 dark:border-gray-700'}
-            hover:border-primary hover:bg-primary/5
+            border-2 border-dashed rounded-xl p-10 text-center cursor-pointer
+            transition-all duration-200
+            ${isDragActive 
+              ? 'border-[#57068C] bg-[#57068C]/10 dark:bg-[#57068C]/20 shadow-lg scale-[1.02]' 
+              : 'border-purple-300 dark:border-purple-700 hover:border-[#57068C] hover:bg-purple-50/50 dark:hover:bg-purple-950/30'
+            }
           `}
         >
           <input {...getInputProps()} />
-          <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <p className="text-lg font-medium mb-2">
+          <div className="flex items-center justify-center mb-4">
+            <div className={`p-4 rounded-full ${isDragActive ? 'bg-[#57068C]' : 'bg-purple-100 dark:bg-purple-900'}`}>
+              <Upload className={`h-8 w-8 ${isDragActive ? 'text-white' : 'text-[#57068C]'}`} />
+            </div>
+          </div>
+          <p className="text-xl font-semibold mb-2 text-gray-900 dark:text-gray-100">
             {isDragActive ? 'Drop files here' : 'Drag & drop files here'}
           </p>
-          <p className="text-sm text-muted-foreground mb-4">
-            or click to browse
+          <p className="text-base text-muted-foreground mb-4">
+            or <span className="text-[#57068C] font-medium">click to browse</span>
           </p>
-          <p className="text-xs text-muted-foreground">
-            Supported: PDF, PPTX, DOCX, XLSX, TXT (Max 50MB per file)
+          <p className="text-sm text-muted-foreground">
+            Supported formats: PDF, PPTX, DOCX, XLSX, TXT • Max 50MB per file
           </p>
         </div>
       </Card>
@@ -163,16 +169,16 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
           <Button
             onClick={handleUpload}
             disabled={uploading}
-            className="w-full mt-4"
+            className="w-full mt-4 bg-gradient-to-r from-[#57068C] to-[#8B2FC9] hover:from-[#6A0BA8] hover:to-[#9D3FD9] text-white shadow-lg h-12 text-base font-semibold"
           >
             {uploading ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Uploading...
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Uploading {selectedFiles.length} file(s)...
               </>
             ) : (
               <>
-                <Upload className="mr-2 h-4 w-4" />
+                <Upload className="mr-2 h-5 w-5" />
                 Upload {selectedFiles.length} file(s)
               </>
             )}

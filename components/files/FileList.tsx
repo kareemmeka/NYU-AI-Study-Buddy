@@ -79,9 +79,11 @@ export function FileList({ onFilesChange }: FileListProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold mb-2">Course Materials</h2>
-        <p className="text-muted-foreground">
-          Upload your course files (PDF, PPTX, DOCX, XLSX, TXT) to enable the AI to answer questions about them.
+        <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-[#57068C] to-[#8B2FC9] bg-clip-text text-transparent">
+          Course Materials
+        </h2>
+        <p className="text-muted-foreground text-lg">
+          Upload your course files (PDF, PPTX, DOCX, XLSX, TXT) from any NYU course. The AI will use these materials to provide accurate, course-specific answers.
         </p>
       </div>
 

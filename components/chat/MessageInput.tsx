@@ -30,14 +30,14 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
   };
 
   return (
-    <div className="border-t bg-background p-4">
-      <div className="flex items-end gap-2 max-w-4xl mx-auto">
+    <div className="border-t border-purple-200 dark:border-purple-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm p-6">
+      <div className="flex items-end gap-3 max-w-5xl mx-auto">
         <div className="flex-1">
           <Input
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask a question about your course..."
+            placeholder="Ask a question about your course materials..."
             disabled={disabled}
             maxLength={maxLength}
             className="min-h-[44px]"
@@ -58,7 +58,7 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
           onClick={handleSend}
           disabled={!message.trim() || disabled || message.length > maxLength}
           size="icon"
-          className="h-11 w-11"
+          className="h-11 w-11 bg-gradient-to-br from-[#57068C] to-[#8B2FC9] hover:from-[#6A0BA8] hover:to-[#9D3FD9] text-white shadow-lg disabled:opacity-50"
         >
           <Send className="h-5 w-5" />
         </Button>

@@ -22,19 +22,21 @@ export function FileItem({ file, onDelete }: FileItemProps) {
   };
 
   return (
-    <Card className="p-4 hover:shadow-md transition-shadow">
+    <Card className="p-5 hover:shadow-lg transition-all border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800">
       <div className="flex items-start gap-4">
-        <div className={`flex-shrink-0 ${fileTypeColors[fileType] || 'text-gray-500'}`}>
-          <File className="h-8 w-8" />
+        <div className={`flex-shrink-0 w-12 h-12 rounded-lg bg-gradient-to-br from-[#57068C] to-[#8B2FC9] flex items-center justify-center shadow-md ${fileTypeColors[fileType] || 'text-white'}`}>
+          <File className="h-6 w-6 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <h4 className="font-medium truncate">{file.name}</h4>
-          <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+          <h4 className="font-semibold text-base truncate text-gray-900 dark:text-gray-100">{file.name}</h4>
+          <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground">
+            <span className="px-2 py-1 rounded-md bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 font-medium uppercase text-xs">
+              {fileType}
+            </span>
+            <span>•</span>
             <span>{formatFileSize(file.size)}</span>
             <span>•</span>
             <span>{formatDate(file.uploadedAt)}</span>
-            <span>•</span>
-            <span className="uppercase">{fileType}</span>
           </div>
         </div>
         <div className="flex items-center gap-2">

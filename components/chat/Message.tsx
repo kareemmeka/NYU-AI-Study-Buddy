@@ -32,10 +32,10 @@ export function Message({ message }: MessageProps) {
     >
       <div
         className={cn(
-          "max-w-[80%] rounded-lg px-4 py-3 shadow-sm",
+          "max-w-[80%] rounded-xl px-5 py-4 shadow-md",
           isUser
-            ? "bg-blue-500 text-white"
-            : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            ? "bg-gradient-to-br from-[#57068C] to-[#8B2FC9] text-white"
+            : "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-purple-100 dark:border-purple-900"
         )}
       >
         <div className="prose prose-sm dark:prose-invert max-w-none">
