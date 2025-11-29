@@ -77,9 +77,15 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
       }
 
       if (data.success) {
+        // Convert date strings to Date objects
+        const filesWithDates = (data.files || []).map((file: any) => ({
+          ...file,
+          uploadedAt: file.uploadedAt ? new Date(file.uploadedAt) : new Date(),
+        }));
+        
         toast({
           title: 'Success',
-          description: `Uploaded ${data.files?.length || 0} file(s) successfully`,
+          description: `Uploaded ${filesWithDates.length} file(s) successfully`,
           variant: 'success',
         });
         setSelectedFiles([]);

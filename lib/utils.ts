@@ -13,14 +13,22 @@ export function formatFileSize(bytes: number): string {
   return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
 
-export function formatDate(date: Date): string {
+export function formatDate(date: Date | string): string {
+  // Handle both Date objects and date strings (from JSON serialization)
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  // Check if date is valid
+  if (isNaN(dateObj.getTime())) {
+    return 'Unknown date';
+  }
+  
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  }).format(date);
+  }).format(dateObj);
 }
 
 export function getFileType(filename: string): string {

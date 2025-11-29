@@ -22,7 +22,12 @@ export function FileList({ onFilesChange }: FileListProps) {
       setLoading(true);
       const response = await fetch('/api/files');
       const data = await response.json();
-      setFiles(data.files || []);
+      // Convert date strings back to Date objects
+      const filesWithDates = (data.files || []).map((file: any) => ({
+        ...file,
+        uploadedAt: file.uploadedAt ? new Date(file.uploadedAt) : new Date(),
+      }));
+      setFiles(filesWithDates);
     } catch (error) {
       toast({
         title: 'Error',
