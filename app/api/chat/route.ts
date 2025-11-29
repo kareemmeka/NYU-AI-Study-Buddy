@@ -122,17 +122,34 @@ function findRelevantSections(question: string, fullContext: string, maxLength: 
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
   const requestId = Math.random().toString(36).substring(7);
-  console.log(`[CHAT:${requestId}] Chat request received`);
+  
+  // Log incoming request
+  console.log(`\n${'='.repeat(80)}`);
+  console.log(`[CHAT:${requestId}] ⬇️  INCOMING REQUEST`);
+  console.log(`[CHAT:${requestId}] Method: POST`);
+  console.log(`[CHAT:${requestId}] Path: /api/chat`);
+  console.log(`[CHAT:${requestId}] Headers:`, {
+    'content-type': req.headers.get('content-type'),
+    'content-length': req.headers.get('content-length'),
+    'user-agent': req.headers.get('user-agent')?.substring(0, 50) + '...',
+  });
+  console.log(`[CHAT:${requestId}] Timestamp: ${new Date().toISOString()}`);
+  console.log(`${'='.repeat(80)}\n`);
   
   try {
-    console.log(`[CHAT:${requestId}] Parsing request body...`);
+    console.log(`[CHAT:${requestId}] 📥 Parsing request body...`);
     const body: ChatRequest = await req.json();
     const { message, conversationHistory = [] } = body;
 
-    console.log(`[CHAT:${requestId}] Message length: ${message?.length || 0}, History length: ${conversationHistory.length}`);
+    console.log(`[CHAT:${requestId}] ✅ Request body parsed`);
+    console.log(`[CHAT:${requestId}] 📝 Message: "${message?.substring(0, 100)}${message && message.length > 100 ? '...' : ''}"`);
+    console.log(`[CHAT:${requestId}] 📊 Message length: ${message?.length || 0} chars`);
+    console.log(`[CHAT:${requestId}] 💬 Conversation history: ${conversationHistory.length} messages`);
 
     if (!message || message.trim().length === 0) {
-      console.error(`[CHAT:${requestId}] Error: Empty message`);
+      const duration = Date.now() - startTime;
+      console.error(`[CHAT:${requestId}] ❌ Error: Empty message (${duration}ms)`);
+      console.log(`[CHAT:${requestId}] ⬆️  RESPONSE: 400 Bad Request\n`);
       return new Response(JSON.stringify({ error: 'Message is required' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
@@ -140,46 +157,63 @@ export async function POST(req: NextRequest) {
     }
 
     // Load course materials
-    console.log(`[CHAT:${requestId}] Loading course materials...`);
+    console.log(`[CHAT:${requestId}] 📚 Loading course materials...`);
+    const materialsStart = Date.now();
     const allMaterials = await loadCourseMaterials();
-    console.log(`[CHAT:${requestId}] Course materials loaded: ${allMaterials.length} characters`);
+    const materialsDuration = Date.now() - materialsStart;
+    console.log(`[CHAT:${requestId}] ✅ Course materials loaded: ${allMaterials.length} characters (${materialsDuration}ms)`);
     
+    console.log(`[CHAT:${requestId}] 🔍 Finding relevant sections...`);
+    const contextStart = Date.now();
     const context = findRelevantSections(message, allMaterials);
-    console.log(`[CHAT:${requestId}] Relevant context selected: ${context.length} characters`);
+    const contextDuration = Date.now() - contextStart;
+    console.log(`[CHAT:${requestId}] ✅ Relevant context selected: ${context.length} characters (${contextDuration}ms)`);
 
     // Build messages array
+    console.log(`[CHAT:${requestId}] 📋 Building messages array...`);
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
       { role: 'system', content: SYSTEM_PROMPT },
     ];
 
     // Add conversation history (last 10 messages to avoid token limits)
     const recentHistory = conversationHistory.slice(-10);
+    console.log(`[CHAT:${requestId}] 📜 Adding ${recentHistory.length} messages from history`);
     for (const msg of recentHistory) {
       messages.push({ role: msg.role, content: msg.content });
     }
 
     // Add current question with context
+    const userMessageContent = `Course Materials:\n${context}\n\nStudent Question: ${message}`;
     messages.push({
       role: 'user',
-      content: `Course Materials:\n${context}\n\nStudent Question: ${message}`,
+      content: userMessageContent,
     });
+    
+    console.log(`[CHAT:${requestId}] ✅ Messages array built: ${messages.length} total messages`);
+    console.log(`[CHAT:${requestId}] 📊 Total message content length: ${userMessageContent.length} chars`);
 
     // Create streaming response
+    console.log(`[CHAT:${requestId}] 🌊 Creating streaming response...`);
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          console.log('Initializing Portkey client...');
-          console.log('AI_MODEL:', AI_MODEL);
-          console.log('PORTKEY_BASE_URL:', process.env.PORTKEY_BASE_URL);
-          console.log('PORTKEY_API_KEY exists:', !!process.env.PORTKEY_API_KEY);
+          console.log(`[CHAT:${requestId}] 🤖 Initializing Portkey client...`);
+          console.log(`[CHAT:${requestId}]   Model: ${AI_MODEL}`);
+          console.log(`[CHAT:${requestId}]   Base URL: ${process.env.PORTKEY_BASE_URL || 'default'}`);
+          console.log(`[CHAT:${requestId}]   API Key: ${process.env.PORTKEY_API_KEY ? '✓ Set' : '✗ Missing'}`);
           
           let response: any;
           
           try {
             // Try using Portkey SDK first
+            console.log(`[CHAT:${requestId}] 🔌 Attempting Portkey SDK connection...`);
+            const sdkStart = Date.now();
             const portkey = await getPortkeyClient();
-            console.log('Portkey client initialized, making API call via SDK...');
+            const sdkInitDuration = Date.now() - sdkStart;
+            console.log(`[CHAT:${requestId}] ✅ Portkey client initialized (${sdkInitDuration}ms)`);
+            console.log(`[CHAT:${requestId}] 📡 Making API call via SDK...`);
             
+            const apiStart = Date.now();
             response = await portkey.chat.completions.create({
               model: AI_MODEL,
               messages: messages as any,
@@ -187,15 +221,17 @@ export async function POST(req: NextRequest) {
               temperature: 0.3,
               stream: true,
             });
+            const apiDuration = Date.now() - apiStart;
             
-            console.log('Portkey SDK call successful, starting stream...');
+            console.log(`[CHAT:${requestId}] ✅ Portkey SDK call successful (${apiDuration}ms)`);
+            console.log(`[CHAT:${requestId}] 🌊 Starting stream...`);
           } catch (sdkError: any) {
             // If SDK fails, try direct fetch as fallback
-            console.error('Portkey SDK error:', sdkError);
-            console.error('SDK error details:', {
+            console.error(`[CHAT:${requestId}] ⚠️  Portkey SDK error:`, sdkError?.message || 'Unknown error');
+            console.error(`[CHAT:${requestId}] SDK error details:`, {
               message: sdkError?.message,
-              cause: sdkError?.cause,
-              stack: sdkError?.stack,
+              status: sdkError?.status,
+              cause: sdkError?.cause?.code || sdkError?.cause?.message,
             });
             
             // Try direct fetch for any SDK error (not just 404)
@@ -206,14 +242,15 @@ export async function POST(req: NextRequest) {
                 sdkError?.cause?.code === 'UND_ERR_CONNECT' ||
                 sdkError?.status === 404 || 
                 sdkError?.message?.includes('not found')) {
-              console.log('Portkey SDK returned 404, trying direct fetch to NYU gateway...');
+              console.log(`[CHAT:${requestId}] 🔄 SDK failed, trying direct fetch fallback...`);
               
               const apiKey = process.env.PORTKEY_API_KEY;
               // Use NYU gateway (matching Python example)
               const baseURL = process.env.PORTKEY_BASE_URL || "https://ai-gateway.apps.cloud.rt.nyu.edu/v1";
               const url = `${baseURL}/chat/completions`;
               
-              console.log('Direct fetch URL:', url);
+              console.log(`[CHAT:${requestId}] 🔗 Direct fetch URL: ${url}`);
+              const fetchStart = Date.now();
               
               const fetchResponse = await fetch(url, {
                 method: 'POST',
@@ -230,18 +267,26 @@ export async function POST(req: NextRequest) {
                 }),
               });
               
+              const fetchDuration = Date.now() - fetchStart;
+              
               if (!fetchResponse.ok) {
                 const errorText = await fetchResponse.text();
+                console.error(`[CHAT:${requestId}] ❌ Direct fetch failed: ${fetchResponse.status} (${fetchDuration}ms)`);
                 throw new Error(`Direct fetch failed (${fetchResponse.status}): ${errorText}`);
               }
               
               if (!fetchResponse.body) {
+                console.error(`[CHAT:${requestId}] ❌ No response body from direct fetch`);
                 throw new Error('No response body from direct fetch');
               }
+              
+              console.log(`[CHAT:${requestId}] ✅ Direct fetch successful (${fetchDuration}ms)`);
+              console.log(`[CHAT:${requestId}] 🌊 Converting to stream...`);
               
               // Convert fetch response to async iterator compatible with Portkey SDK format
               const reader = fetchResponse.body.getReader();
               const decoder = new TextDecoder();
+              let chunkCount = 0;
               
               response = {
                 async *[Symbol.asyncIterator]() {
@@ -249,6 +294,7 @@ export async function POST(req: NextRequest) {
                     const { done, value } = await reader.read();
                     if (done) break;
                     
+                    chunkCount++;
                     const chunk = decoder.decode(value, { stream: true });
                     const lines = chunk.split('\n');
                     
@@ -275,24 +321,34 @@ export async function POST(req: NextRequest) {
                 }
               };
               
-              console.log('Direct fetch successful, using streaming response');
+              console.log(`[CHAT:${requestId}] ✅ Stream converter ready`);
             } else {
               throw sdkError;
             }
           }
           
           let hasContent = false;
+          let totalContentLength = 0;
+          let chunkCount = 0;
 
+          console.log(`[CHAT:${requestId}] 📥 Reading stream chunks...`);
+          const streamStart = Date.now();
+          
           for await (const chunk of response) {
+            chunkCount++;
             const content = chunk.choices?.[0]?.delta?.content || '';
             if (content) {
               hasContent = true;
+              totalContentLength += content.length;
               controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ content })}\n\n`));
             }
           }
+          
+          const streamDuration = Date.now() - streamStart;
+          console.log(`[CHAT:${requestId}] ✅ Stream completed: ${chunkCount} chunks, ${totalContentLength} chars (${streamDuration}ms)`);
 
           if (!hasContent) {
-            console.warn('No content received from Portkey API');
+            console.warn(`[CHAT:${requestId}] ⚠️  No content received from Portkey API`);
             controller.enqueue(
               new TextEncoder().encode(`data: ${JSON.stringify({ error: 'No response from AI. Please check your Portkey configuration and try again.' })}\n\n`)
             );
@@ -300,23 +356,32 @@ export async function POST(req: NextRequest) {
 
           controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
           controller.close();
-        } catch (error) {
-          console.error('Portkey API error:', error);
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          const errorDetails = error instanceof Error ? error.stack : String(error);
-          console.error('Error details:', errorDetails);
           
+          const totalDuration = Date.now() - startTime;
+          console.log(`[CHAT:${requestId}] ⬆️  RESPONSE: 200 OK (Stream) (${totalDuration}ms total)`);
+          console.log(`[CHAT:${requestId}] 📊 Summary: ${totalContentLength} chars, ${chunkCount} chunks\n`);
+        } catch (error) {
+          const duration = Date.now() - startTime;
+          console.error(`\n[CHAT:${requestId}] ❌ ERROR in stream handler (${duration}ms)`);
+          console.error(`[CHAT:${requestId}] Error message:`, error instanceof Error ? error.message : String(error));
+          console.error(`[CHAT:${requestId}] Error name:`, error instanceof Error ? error.name : 'Unknown');
+          if (error instanceof Error && error.stack) {
+            console.error(`[CHAT:${requestId}] Stack trace:`, error.stack);
+          }
+          
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           controller.enqueue(
             new TextEncoder().encode(`data: ${JSON.stringify({ 
               error: `AI Error: ${errorMessage}. Please check your Portkey API key and configuration.` 
             })}\n\n`)
           );
           controller.close();
+          console.log(`[CHAT:${requestId}] ⬆️  RESPONSE: Error stream sent\n`);
         }
       },
     });
 
-    console.log(`[CHAT:${requestId}] Streaming response initialized`);
+    console.log(`[CHAT:${requestId}] ✅ Streaming response initialized and returned`);
     return new Response(stream, {
       headers: {
         'Content-Type': 'text/event-stream',
@@ -326,12 +391,13 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error(`[CHAT:${requestId}] Error after ${duration}ms:`, error);
-    console.error(`[CHAT:${requestId}] Error details:`, {
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      name: error instanceof Error ? error.name : undefined,
-    });
+    console.error(`\n[CHAT:${requestId}] ❌ ERROR after ${duration}ms`);
+    console.error(`[CHAT:${requestId}] Error message:`, error instanceof Error ? error.message : String(error));
+    console.error(`[CHAT:${requestId}] Error name:`, error instanceof Error ? error.name : 'Unknown');
+    if (error instanceof Error && error.stack) {
+      console.error(`[CHAT:${requestId}] Stack trace:`, error.stack);
+    }
+    console.error(`[CHAT:${requestId}] ⬆️  RESPONSE: 500 Internal Server Error\n`);
     
     return new Response(
       JSON.stringify({ 

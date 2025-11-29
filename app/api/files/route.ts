@@ -2,14 +2,24 @@ import { NextRequest } from 'next/server';
 import { listFiles, deleteFile } from '@/lib/storage';
 import { FileListResponse } from '@/types';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const startTime = Date.now();
-  console.log('[FILES] GET request - Listing files...');
+  const requestId = Math.random().toString(36).substring(7);
+  
+  // Log incoming request
+  console.log(`\n${'='.repeat(80)}`);
+  console.log(`[FILES:${requestId}] ⬇️  INCOMING REQUEST`);
+  console.log(`[FILES:${requestId}] Method: GET`);
+  console.log(`[FILES:${requestId}] Path: /api/files`);
+  console.log(`[FILES:${requestId}] Timestamp: ${new Date().toISOString()}`);
+  console.log(`${'='.repeat(80)}\n`);
   
   try {
+    console.log(`[FILES:${requestId}] 📂 Listing files...`);
     const files = await listFiles();
     const duration = Date.now() - startTime;
-    console.log(`[FILES] Successfully listed ${files.length} files in ${duration}ms`);
+    console.log(`[FILES:${requestId}] ✅ Successfully listed ${files.length} file(s) in ${duration}ms`);
+    console.log(`[FILES:${requestId}] ⬆️  RESPONSE: 200 OK (${duration}ms)\n`);
     
     return new Response(
       JSON.stringify({ files } as FileListResponse),
@@ -17,12 +27,13 @@ export async function GET() {
     );
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error(`[FILES] Error after ${duration}ms:`, error);
-    console.error('[FILES] Error details:', {
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      name: error instanceof Error ? error.name : undefined,
-    });
+    console.error(`\n[FILES:${requestId}] ❌ ERROR after ${duration}ms`);
+    console.error(`[FILES:${requestId}] Error message:`, error instanceof Error ? error.message : String(error));
+    console.error(`[FILES:${requestId}] Error name:`, error instanceof Error ? error.name : 'Unknown');
+    if (error instanceof Error && error.stack) {
+      console.error(`[FILES:${requestId}] Stack trace:`, error.stack);
+    }
+    console.error(`[FILES:${requestId}] ⬆️  RESPONSE: 500 Internal Server Error\n`);
     
     return new Response(
       JSON.stringify({ 
@@ -37,25 +48,40 @@ export async function GET() {
 
 export async function DELETE(req: NextRequest) {
   const startTime = Date.now();
-  console.log('[FILES] DELETE request received');
+  const requestId = Math.random().toString(36).substring(7);
+  
+  // Log incoming request
+  console.log(`\n${'='.repeat(80)}`);
+  console.log(`[FILES:${requestId}] ⬇️  INCOMING REQUEST`);
+  console.log(`[FILES:${requestId}] Method: DELETE`);
+  console.log(`[FILES:${requestId}] Path: /api/files`);
+  console.log(`[FILES:${requestId}] Timestamp: ${new Date().toISOString()}`);
+  console.log(`${'='.repeat(80)}\n`);
   
   try {
     const { searchParams } = new URL(req.url);
     const fileId = searchParams.get('id');
 
-    console.log(`[FILES] Delete request for file ID: ${fileId}`);
+    console.log(`[FILES:${requestId}] 🗑️  Delete request for file ID: ${fileId}`);
 
     if (!fileId) {
-      console.error('[FILES] Error: File ID is required');
+      const duration = Date.now() - startTime;
+      console.error(`[FILES:${requestId}] ❌ Error: File ID is required (${duration}ms)`);
+      console.log(`[FILES:${requestId}] ⬆️  RESPONSE: 400 Bad Request\n`);
       return new Response(
         JSON.stringify({ error: 'File ID is required' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
+    console.log(`[FILES:${requestId}] 🚀 Deleting file...`);
+    const deleteStart = Date.now();
     await deleteFile(fileId);
-    const duration = Date.now() - startTime;
-    console.log(`[FILES] Successfully deleted file ${fileId} in ${duration}ms`);
+    const deleteDuration = Date.now() - deleteStart;
+    const totalDuration = Date.now() - startTime;
+    
+    console.log(`[FILES:${requestId}] ✅ Successfully deleted file ${fileId} (${deleteDuration}ms)`);
+    console.log(`[FILES:${requestId}] ⬆️  RESPONSE: 200 OK (${totalDuration}ms total)\n`);
     
     return new Response(
       JSON.stringify({ success: true }),
@@ -63,12 +89,13 @@ export async function DELETE(req: NextRequest) {
     );
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error(`[FILES] Error deleting file after ${duration}ms:`, error);
-    console.error('[FILES] Error details:', {
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      name: error instanceof Error ? error.name : undefined,
-    });
+    console.error(`\n[FILES:${requestId}] ❌ ERROR after ${duration}ms`);
+    console.error(`[FILES:${requestId}] Error message:`, error instanceof Error ? error.message : String(error));
+    console.error(`[FILES:${requestId}] Error name:`, error instanceof Error ? error.name : 'Unknown');
+    if (error instanceof Error && error.stack) {
+      console.error(`[FILES:${requestId}] Stack trace:`, error.stack);
+    }
+    console.error(`[FILES:${requestId}] ⬆️  RESPONSE: 500 Internal Server Error\n`);
     
     return new Response(
       JSON.stringify({ 

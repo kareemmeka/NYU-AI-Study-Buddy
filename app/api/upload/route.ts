@@ -8,20 +8,38 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
-  console.log('[UPLOAD] Upload request received');
+  const requestId = Math.random().toString(36).substring(7);
+  
+  // Log incoming request
+  console.log(`\n${'='.repeat(80)}`);
+  console.log(`[UPLOAD:${requestId}] ⬇️  INCOMING REQUEST`);
+  console.log(`[UPLOAD:${requestId}] Method: POST`);
+  console.log(`[UPLOAD:${requestId}] Path: /api/upload`);
+  console.log(`[UPLOAD:${requestId}] Headers:`, {
+    'content-type': req.headers.get('content-type'),
+    'content-length': req.headers.get('content-length'),
+    'user-agent': req.headers.get('user-agent')?.substring(0, 50) + '...',
+  });
+  console.log(`[UPLOAD:${requestId}] Timestamp: ${new Date().toISOString()}`);
+  console.log(`${'='.repeat(80)}\n`);
   
   try {
-    console.log('[UPLOAD] Parsing form data...');
+    console.log(`[UPLOAD:${requestId}] 📥 Parsing form data...`);
     const formData = await req.formData();
     const files = formData.getAll('files') as File[];
 
-    console.log('[UPLOAD] Files received:', files.length);
+    console.log(`[UPLOAD:${requestId}] ✅ Form data parsed successfully`);
+    console.log(`[UPLOAD:${requestId}] 📦 Files received: ${files.length}`);
     files.forEach((file, index) => {
-      console.log(`[UPLOAD] File ${index + 1}: ${file.name}, size: ${file.size} bytes, type: ${file.type}`);
+      console.log(`[UPLOAD:${requestId}]   File ${index + 1}/${files.length}: ${file.name}`);
+      console.log(`[UPLOAD:${requestId}]     - Size: ${(file.size / 1024).toFixed(2)} KB`);
+      console.log(`[UPLOAD:${requestId}]     - Type: ${file.type || 'unknown'}`);
     });
 
     if (files.length === 0) {
-      console.error('[UPLOAD] Error: No files provided');
+      const duration = Date.now() - startTime;
+      console.error(`[UPLOAD:${requestId}] ❌ Error: No files provided (${duration}ms)`);
+      console.log(`[UPLOAD:${requestId}] ⬆️  RESPONSE: 400 Bad Request\n`);
       return new Response(
         JSON.stringify({ success: false, error: 'No files provided' } as UploadResponse),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
@@ -29,6 +47,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (files.length > MAX_FILES) {
+      const duration = Date.now() - startTime;
+      console.error(`[UPLOAD:${requestId}] ❌ Error: Too many files (${files.length} > ${MAX_FILES}) (${duration}ms)`);
+      console.log(`[UPLOAD:${requestId}] ⬆️  RESPONSE: 400 Bad Request\n`);
       return new Response(
         JSON.stringify({
           success: false,
@@ -52,6 +73,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (invalidFiles.length > 0) {
+      const duration = Date.now() - startTime;
+      console.error(`[UPLOAD:${requestId}] ❌ Error: Invalid file types: ${invalidFiles.join(', ')} (${duration}ms)`);
+      console.log(`[UPLOAD:${requestId}] ⬆️  RESPONSE: 400 Bad Request\n`);
       return new Response(
         JSON.stringify({
           success: false,
@@ -62,6 +86,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (oversizedFiles.length > 0) {
+      const duration = Date.now() - startTime;
+      console.error(`[UPLOAD:${requestId}] ❌ Error: Files too large: ${oversizedFiles.join(', ')} (${duration}ms)`);
+      console.log(`[UPLOAD:${requestId}] ⬆️  RESPONSE: 400 Bad Request\n`);
       return new Response(
         JSON.stringify({
           success: false,
@@ -72,15 +99,20 @@ export async function POST(req: NextRequest) {
     }
 
     // Upload files
-    console.log('[UPLOAD] Starting file upload to Vercel Blob...');
+    console.log(`[UPLOAD:${requestId}] 🚀 Starting file upload to Vercel Blob...`);
+    const uploadStart = Date.now();
     const uploadedFiles = await uploadFiles(files);
-    console.log('[UPLOAD] Successfully uploaded files:', uploadedFiles.length);
+    const uploadDuration = Date.now() - uploadStart;
+    
+    console.log(`[UPLOAD:${requestId}] ✅ Successfully uploaded ${uploadedFiles.length} file(s) in ${uploadDuration}ms`);
     uploadedFiles.forEach((file, index) => {
-      console.log(`[UPLOAD] Uploaded ${index + 1}: ${file.name}, URL: ${file.url}`);
+      console.log(`[UPLOAD:${requestId}]   ✓ ${index + 1}/${uploadedFiles.length}: ${file.name}`);
+      console.log(`[UPLOAD:${requestId}]     URL: ${file.url}`);
     });
 
-    const duration = Date.now() - startTime;
-    console.log(`[UPLOAD] Upload completed in ${duration}ms`);
+    const totalDuration = Date.now() - startTime;
+    console.log(`[UPLOAD:${requestId}] ⬆️  RESPONSE: 200 OK (${totalDuration}ms total)`);
+    console.log(`[UPLOAD:${requestId}] 📊 Summary: ${uploadedFiles.length} files, ${totalDuration}ms\n`);
 
     return new Response(
       JSON.stringify({ success: true, files: uploadedFiles } as UploadResponse),
@@ -88,12 +120,13 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error(`[UPLOAD] Error after ${duration}ms:`, error);
-    console.error('[UPLOAD] Error details:', {
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      name: error instanceof Error ? error.name : undefined,
-    });
+    console.error(`\n[UPLOAD:${requestId}] ❌ ERROR after ${duration}ms`);
+    console.error(`[UPLOAD:${requestId}] Error message:`, error instanceof Error ? error.message : String(error));
+    console.error(`[UPLOAD:${requestId}] Error name:`, error instanceof Error ? error.name : 'Unknown');
+    if (error instanceof Error && error.stack) {
+      console.error(`[UPLOAD:${requestId}] Stack trace:`, error.stack);
+    }
+    console.error(`[UPLOAD:${requestId}] ⬆️  RESPONSE: 500 Internal Server Error\n`);
     
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
