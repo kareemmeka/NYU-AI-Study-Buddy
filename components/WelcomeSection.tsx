@@ -16,7 +16,7 @@ export function WelcomeSection({ onGetStarted }: WelcomeSectionProps) {
         <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-purple-600 shadow-lg mb-4">
           <Sparkles className="h-10 w-10 text-white" />
         </div>
-        <h1 className="text-4xl md:text-5xl font-bold text-white drop-shadow-lg">
+        <h1 className="text-4xl md:text-5xl font-bold text-white drop-shadow-lg leading-normal pb-2">
           Welcome to NYU AI Study Buddy
         </h1>
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
