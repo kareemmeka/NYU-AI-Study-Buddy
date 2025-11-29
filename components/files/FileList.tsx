@@ -60,25 +60,33 @@ export function FileList({ onFilesChange }: FileListProps) {
 
     setDeleting(fileId);
     try {
+      console.log('[FileList] Deleting file:', fileId);
       const response = await fetch(`/api/files?id=${fileId}`, {
         method: 'DELETE',
       });
 
-      if (response.ok) {
-        setFiles((prev) => prev.filter((f) => f.id !== fileId));
-        toast({
-          title: 'Success',
-          description: 'File deleted successfully',
-          variant: 'success',
-        });
-        onFilesChange?.();
-      } else {
-        throw new Error('Failed to delete file');
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error('[FileList] Delete failed:', response.status, errorText);
+        throw new Error(`Failed to delete file: ${response.status} ${response.statusText}`);
       }
+
+      const data = await response.json();
+      console.log('[FileList] File deleted successfully:', fileId);
+      
+      setFiles((prev) => prev.filter((f) => f.id !== fileId));
+      toast({
+        title: 'Success',
+        description: 'File deleted successfully',
+        variant: 'success',
+      });
+      onFilesChange?.();
     } catch (error) {
+      console.error('[FileList] Error deleting file:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete file';
       toast({
         title: 'Error',
-        description: 'Failed to delete file',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
