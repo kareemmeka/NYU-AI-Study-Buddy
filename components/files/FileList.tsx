@@ -8,6 +8,7 @@ import { Loader2, FolderOpen, MessageSquare, ArrowRight } from 'lucide-react';
 import { toast } from '@/components/ui/toast';
 import { formatFileSize } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 interface FileListProps {
   onFilesChange?: () => void;
@@ -17,6 +18,7 @@ export function FileList({ onFilesChange }: FileListProps) {
   const [files, setFiles] = useState<FileMetadata[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; url?: string; name: string } | null>(null);
 
   const loadFiles = async () => {
     try {
@@ -56,34 +58,55 @@ export function FileList({ onFilesChange }: FileListProps) {
     loadFiles();
   }, []);
 
-  const handleDelete = async (fileId: string) => {
-    if (!confirm('Are you sure you want to delete this file?')) return;
+  const handleDeleteRequest = (fileId: string, fileUrl?: string) => {
+    const file = files.find(f => f.id === fileId);
+    setDeleteConfirm({ id: fileId, url: fileUrl, name: file?.name || 'this file' });
+  };
 
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm) return;
+    
+    const { id: fileId, url: fileUrl } = deleteConfirm;
+    setDeleteConfirm(null);
     setDeleting(fileId);
+    
     try {
-      console.log('[FileList] Deleting file:', fileId);
-      const response = await fetch(`/api/files?id=${fileId}`, {
+      console.log('[FileList] Deleting file:', { fileId, fileUrl });
+      
+      // Also pass the URL if available (for more reliable deletion)
+      const params = new URLSearchParams({ id: fileId });
+      if (fileUrl) {
+        params.append('url', fileUrl);
+      }
+      const response = await fetch(`/api/files?${params.toString()}`, {
         method: 'DELETE',
       });
 
       if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        const errorText = errorData.error || errorData.details || 'Unknown error';
         console.error('[FileList] Delete failed:', response.status, errorText);
-        throw new Error(`Failed to delete file: ${response.status} ${response.statusText}`);
+        throw new Error(`Failed to delete file: ${errorText}`);
       }
 
-      const data = await response.json();
-      console.log('[FileList] File deleted successfully:', fileId);
+      console.log('[FileList] ✅ File deleted successfully:', fileId);
       
+      // Remove from local state immediately
       setFiles((prev) => prev.filter((f) => f.id !== fileId));
+      
+      // Reload files from server to ensure consistency
+      await loadFiles();
+      
       toast({
-        title: 'Success',
-        description: 'File deleted successfully',
+        title: 'File Deleted',
+        description: 'The file has been removed from your materials',
         variant: 'success',
       });
+      
+      // Notify parent component
       onFilesChange?.();
     } catch (error) {
-      console.error('[FileList] Error deleting file:', error);
+      console.error('[FileList] ❌ Error deleting file:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete file';
       toast({
         title: 'Error',
@@ -153,14 +176,25 @@ export function FileList({ onFilesChange }: FileListProps) {
               <FileItem
                 key={file.id}
                 file={file}
-                onDelete={handleDelete}
+                onDelete={handleDeleteRequest}
+                isDeleting={deleting === file.id}
               />
             ))}
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteConfirm !== null}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete File?"
+        description={`Are you sure you want to delete "${deleteConfirm?.name}"? The AI will no longer be able to reference this material.`}
+        confirmText="Delete"
+        type="danger"
+        icon="trash"
+      />
     </div>
   );
 }
-
-

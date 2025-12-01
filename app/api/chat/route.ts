@@ -4,10 +4,10 @@ import { listFiles } from '@/lib/storage';
 import { extractTextFromFile } from '@/lib/file-extractors';
 import { ChatRequest, Message } from '@/types';
 
-const MAX_CONTEXT_LENGTH = 100000; // Limit context to avoid token limits
+const MAX_CONTEXT_LENGTH = 200000; // Increased to include more content
 
-async function loadCourseMaterials(): Promise<string> {
-  console.log('[MATERIALS] Loading course materials...');
+async function loadCourseMaterials(): Promise<{ text: string; fileCount: number; fileNames: string[] }> {
+  console.log('[MATERIALS] Loading ALL course materials...');
   const startTime = Date.now();
   
   try {
@@ -16,23 +16,23 @@ async function loadCourseMaterials(): Promise<string> {
     
     if (files.length === 0) {
       console.log('[MATERIALS] No files found, returning empty message');
-      return 'No course materials uploaded yet.';
+      return { text: 'No course materials uploaded yet.', fileCount: 0, fileNames: [] };
     }
 
     const materialTexts: string[] = [];
-    const maxFilesToProcess = 10; // Limit to prevent timeout
+    const successfulFiles: string[] = [];
+    const failedFiles: string[] = [];
 
-    // Process files in parallel with limit
-    const filesToProcess = files.slice(0, maxFilesToProcess);
-    console.log(`[MATERIALS] Processing ${filesToProcess.length} files...`);
+    // Process ALL files - no limit
+    console.log(`[MATERIALS] Processing ALL ${files.length} files...`);
     
-    const extractionPromises = filesToProcess.map(async (file, index) => {
+    const extractionPromises = files.map(async (file, index) => {
       try {
-        console.log(`[MATERIALS] Processing file ${index + 1}/${filesToProcess.length}: ${file.name}`);
+        console.log(`[MATERIALS] Processing file ${index + 1}/${files.length}: ${file.name}`);
         const fetchStart = Date.now();
         
         const response = await fetch(file.url, { 
-          signal: AbortSignal.timeout(30000) // 30 second timeout per file
+          signal: AbortSignal.timeout(45000) // Increased timeout
         });
         
         if (!response.ok) {
@@ -48,267 +48,379 @@ async function loadCourseMaterials(): Promise<string> {
         const extractDuration = Date.now() - extractStart;
         
         if (extracted.text && !extracted.error) {
-          console.log(`[MATERIALS] Extracted ${extracted.text.length} characters from ${file.name} in ${extractDuration}ms`);
-          return `\n\n=== ${file.name} ===\n${extracted.text}`;
+          console.log(`[MATERIALS] ✅ Extracted ${extracted.text.length} chars from ${file.name} in ${extractDuration}ms`);
+          successfulFiles.push(file.name);
+          return { name: file.name, text: extracted.text };
         } else {
-          console.warn(`[MATERIALS] Extraction failed for ${file.name}:`, extracted.error);
+          console.warn(`[MATERIALS] ⚠️ Extraction failed for ${file.name}:`, extracted.error);
+          failedFiles.push(file.name);
           return null;
         }
       } catch (error) {
-        console.error(`[MATERIALS] Error processing file ${file.name}:`, error);
-        console.error(`[MATERIALS] Error details:`, {
-          message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        });
+        console.error(`[MATERIALS] ❌ Error processing file ${file.name}:`, error);
+        failedFiles.push(file.name);
         return null;
       }
     });
 
     const results = await Promise.all(extractionPromises);
-    materialTexts.push(...results.filter((r): r is string => r !== null));
+    
+    // Build the text with clear file separators
+    for (const result of results) {
+      if (result) {
+        materialTexts.push(`\n\n${'='.repeat(50)}\n=== FILE: ${result.name} ===\n${'='.repeat(50)}\n${result.text}`);
+      }
+    }
     
     const totalDuration = Date.now() - startTime;
     const totalText = materialTexts.join('\n');
-    console.log(`[MATERIALS] Loaded ${materialTexts.length} files, ${totalText.length} total characters in ${totalDuration}ms`);
+    
+    console.log(`[MATERIALS] ========== SUMMARY ==========`);
+    console.log(`[MATERIALS] Total files found: ${files.length}`);
+    console.log(`[MATERIALS] Successfully processed: ${successfulFiles.length}`);
+    console.log(`[MATERIALS] Failed to process: ${failedFiles.length}`);
+    console.log(`[MATERIALS] Total text length: ${totalText.length} characters`);
+    console.log(`[MATERIALS] Processing time: ${totalDuration}ms`);
+    console.log(`[MATERIALS] Files included: ${successfulFiles.join(', ')}`);
+    if (failedFiles.length > 0) {
+      console.log(`[MATERIALS] Files failed: ${failedFiles.join(', ')}`);
+    }
+    console.log(`[MATERIALS] ================================`);
 
-    return totalText;
+    return { text: totalText, fileCount: successfulFiles.length, fileNames: successfulFiles };
   } catch (error) {
     const duration = Date.now() - startTime;
     console.error(`[MATERIALS] Error loading course materials after ${duration}ms:`, error);
-    console.error('[MATERIALS] Error details:', {
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-    return 'Error loading course materials.';
+    return { text: 'Error loading course materials.', fileCount: 0, fileNames: [] };
   }
 }
 
-function findRelevantSections(question: string, fullContext: string, maxLength: number = MAX_CONTEXT_LENGTH): string {
-  const questionLower = question.toLowerCase();
-  const keywords = questionLower.split(/\s+/).filter(k => k.length > 2);
-  
-  if (keywords.length === 0) {
-    return fullContext.substring(0, maxLength);
+function selectRelevantContent(question: string, fullContext: string, fileNames: string[], maxLength: number = MAX_CONTEXT_LENGTH): string {
+  // If content fits, return all of it
+  if (!fullContext || fullContext.length === 0) {
+    return fullContext;
   }
 
-  const sections = fullContext.split(/=== /);
-  const relevantSections: Array<{ score: number; text: string }> = [];
+  // IMPORTANT: If content is within limit, include ALL of it
+  if (fullContext.length <= maxLength) {
+    console.log(`[CONTEXT] Content (${fullContext.length} chars) fits within limit (${maxLength}). Including ALL content.`);
+    return fullContext;
+  }
 
-  for (const section of sections) {
-    const sectionLower = section.toLowerCase();
-    const relevanceScore = keywords.reduce((score, keyword) => {
-      return score + (sectionLower.includes(keyword) ? 1 : 0);
-    }, 0);
+  console.log(`[CONTEXT] Content (${fullContext.length} chars) exceeds limit (${maxLength}). Selecting most relevant sections...`);
 
-    if (relevanceScore > 0) {
-      relevantSections.push({ score: relevanceScore, text: section });
+  const questionLower = question.toLowerCase();
+  const keywords = questionLower
+    .split(/\s+/)
+    .filter(k => k.length >= 2)
+    .map(k => k.replace(/[^\w]/g, ''))
+    .filter(k => k.length >= 2);
+  
+  // Check if question mentions specific files
+  const fileNamesInQuestion: string[] = [];
+  for (const fileName of fileNames) {
+    const fileNameLower = fileName.toLowerCase().replace(/[^\w]/g, '');
+    const fileNameWords = fileName.toLowerCase().split(/[\s_.-]+/);
+    
+    // Check if any part of filename is mentioned
+    for (const word of fileNameWords) {
+      if (word.length > 3 && questionLower.includes(word)) {
+        fileNamesInQuestion.push(fileName);
+        break;
+      }
+    }
+    
+    // Also check direct filename reference
+    if (questionLower.includes(fileNameLower)) {
+      if (!fileNamesInQuestion.includes(fileName)) {
+        fileNamesInQuestion.push(fileName);
+      }
     }
   }
+  
+  console.log(`[CONTEXT] Keywords: ${keywords.join(', ')}`);
+  console.log(`[CONTEXT] Files mentioned in question: ${fileNamesInQuestion.join(', ') || 'none'}`);
 
-  relevantSections.sort((a, b) => b.score - a.score);
+  // Split into file sections
+  const sections = fullContext.split(/={50,}\n=== FILE: /);
+  const allSections: Array<{ score: number; text: string; filename: string; size: number }> = [];
 
+  for (let i = 0; i < sections.length; i++) {
+    const section = sections[i];
+    if (!section || section.trim().length === 0) continue;
+    
+    // Extract filename from section
+    const filenameMatch = section.match(/^([^\n=]+)/);
+    const filename = filenameMatch ? filenameMatch[1].trim().replace(' ===', '') : `Section ${i}`;
+    const filenameLower = filename.toLowerCase();
+    
+    const sectionLower = section.toLowerCase();
+    let relevanceScore = 0;
+    
+    // Highest priority: file explicitly mentioned in question
+    if (fileNamesInQuestion.some(f => f.toLowerCase() === filenameLower)) {
+      relevanceScore += 1000;
+      console.log(`[CONTEXT] +1000 for "${filename}" - explicitly mentioned`);
+    }
+    
+    // High priority: filename contains keywords
+    for (const keyword of keywords) {
+      if (filenameLower.includes(keyword)) {
+        relevanceScore += 50;
+      }
+    }
+    
+    // Medium priority: content contains keywords
+    for (const keyword of keywords) {
+      const count = (sectionLower.match(new RegExp(keyword, 'g')) || []).length;
+      relevanceScore += Math.min(count * 2, 30); // Cap at 30 per keyword
+    }
+    
+    // Small base score for all files to ensure some representation
+    relevanceScore += 1;
+    
+    allSections.push({ 
+      score: relevanceScore, 
+      text: i === 0 ? section : `${'='.repeat(50)}\n=== FILE: ${section}`,
+      filename, 
+      size: section.length 
+    });
+  }
+
+  // Sort by relevance
+  allSections.sort((a, b) => b.score - a.score);
+
+  console.log(`[CONTEXT] Section scores:`);
+  for (const s of allSections) {
+    console.log(`[CONTEXT]   - ${s.filename}: score=${s.score}, size=${s.size}`);
+  }
+
+  // Build result, prioritizing high-scoring sections
   let result = '';
-  for (const { text } of relevantSections) {
-    if (result.length + text.length < maxLength) {
-      result += '=== ' + text;
+  const includedFiles: string[] = [];
+  
+  for (const { text, filename, score } of allSections) {
+    if (result.length + text.length <= maxLength) {
+      result += text;
+      includedFiles.push(filename);
+    } else if (score >= 100) {
+      // Always try to include high-priority files even if truncated
+      const remaining = maxLength - result.length;
+      if (remaining > 1000) {
+        result += text.substring(0, remaining);
+        includedFiles.push(`${filename} (truncated)`);
+      }
+      break;
     } else {
       break;
     }
   }
 
-  return result || fullContext.substring(0, maxLength);
+  console.log(`[CONTEXT] Final result: ${result.length} chars, files included: ${includedFiles.join(', ')}`);
+
+  if (result.length === 0) {
+    return fullContext.substring(0, maxLength);
+  }
+
+  return result;
 }
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
   const requestId = Math.random().toString(36).substring(7);
   
-  // Log incoming request
   console.log(`\n${'='.repeat(80)}`);
   console.log(`[CHAT:${requestId}] ⬇️  INCOMING REQUEST`);
-  console.log(`[CHAT:${requestId}] Method: POST`);
-  console.log(`[CHAT:${requestId}] Path: /api/chat`);
-  console.log(`[CHAT:${requestId}] Headers:`, {
-    'content-type': req.headers.get('content-type'),
-    'content-length': req.headers.get('content-length'),
-    'user-agent': req.headers.get('user-agent')?.substring(0, 50) + '...',
-  });
   console.log(`[CHAT:${requestId}] Timestamp: ${new Date().toISOString()}`);
   console.log(`${'='.repeat(80)}\n`);
   
   try {
-    console.log(`[CHAT:${requestId}] 📥 Parsing request body...`);
     const body: ChatRequest = await req.json();
-    const { message, conversationHistory = [] } = body;
+    const { message, conversationHistory = [], model: requestedModel, user } = body;
+    
+    // Use model from request, or fall back to environment variable, or default
+    const modelToUse = requestedModel || AI_MODEL;
 
-    console.log(`[CHAT:${requestId}] ✅ Request body parsed`);
-    console.log(`[CHAT:${requestId}] 📝 Message: "${message?.substring(0, 100)}${message && message.length > 100 ? '...' : ''}"`);
-    console.log(`[CHAT:${requestId}] 📊 Message length: ${message?.length || 0} chars`);
-    console.log(`[CHAT:${requestId}] 💬 Conversation history: ${conversationHistory.length} messages`);
+    console.log(`[CHAT:${requestId}] 📝 Message: "${message?.substring(0, 100)}..."`);
+    console.log(`[CHAT:${requestId}] 💬 History: ${conversationHistory.length} messages`);
+    console.log(`[CHAT:${requestId}] 🤖 Model: ${modelToUse}`);
+    console.log(`[CHAT:${requestId}] 👤 User: ${user?.name || 'Guest'}`);
 
     if (!message || message.trim().length === 0) {
-      const duration = Date.now() - startTime;
-      console.error(`[CHAT:${requestId}] ❌ Error: Empty message (${duration}ms)`);
-      console.log(`[CHAT:${requestId}] ⬆️  RESPONSE: 400 Bad Request\n`);
       return new Response(JSON.stringify({ error: 'Message is required' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    // Load course materials
-    console.log(`[CHAT:${requestId}] 📚 Loading course materials...`);
-    const materialsStart = Date.now();
-    const allMaterials = await loadCourseMaterials();
-    const materialsDuration = Date.now() - materialsStart;
-    console.log(`[CHAT:${requestId}] ✅ Course materials loaded: ${allMaterials.length} characters (${materialsDuration}ms)`);
+    console.log(`[CHAT:${requestId}] 📚 Loading ALL course materials...`);
+    const { text: allMaterials, fileCount, fileNames } = await loadCourseMaterials();
     
-    console.log(`[CHAT:${requestId}] 🔍 Finding relevant sections...`);
-    const contextStart = Date.now();
-    const context = findRelevantSections(message, allMaterials);
-    const contextDuration = Date.now() - contextStart;
-    console.log(`[CHAT:${requestId}] ✅ Relevant context selected: ${context.length} characters (${contextDuration}ms)`);
+    const hasMaterials = fileCount > 0 && 
+                        allMaterials !== 'No course materials uploaded yet.' &&
+                        allMaterials !== 'Error loading course materials.';
+    
+    console.log(`[CHAT:${requestId}] 📊 Loaded ${fileCount} files: ${fileNames.join(', ')}`);
+    
+    const context = hasMaterials ? selectRelevantContent(message, allMaterials, fileNames, MAX_CONTEXT_LENGTH) : allMaterials;
+    console.log(`[CHAT:${requestId}] ✅ Context prepared: ${context.length} characters`);
 
-    // Build messages array
-    console.log(`[CHAT:${requestId}] 📋 Building messages array...`);
+    // Generate personalized system prompt if user is logged in
+    let personalizedPrompt = SYSTEM_PROMPT;
+    if (user) {
+      const { name, preferences, memory } = user;
+      personalizedPrompt += `\n\n--- PERSONALIZATION FOR ${name.toUpperCase()} ---\n`;
+      
+      // Academic context
+      personalizedPrompt += `You are speaking with ${name}`;
+      if (preferences.academicLevel) {
+        personalizedPrompt += `, a ${preferences.academicLevel} student`;
+      }
+      if (preferences.major) {
+        personalizedPrompt += ` majoring in ${preferences.major}`;
+      }
+      personalizedPrompt += '.\n';
+      
+      // Learning style
+      const learningStyles: Record<string, string> = {
+        visual: 'They learn best with diagrams, charts, and visual representations. Include visual descriptions when helpful.',
+        auditory: 'They learn best through verbal explanations. Use conversational language.',
+        reading: 'They learn best through reading and written materials. Provide detailed written explanations.',
+        kinesthetic: 'They learn best through hands-on examples. Include practice problems and real-world applications.',
+      };
+      personalizedPrompt += learningStyles[preferences.learningStyle] + '\n';
+      
+      // Response style
+      const responseStyles: Record<string, string> = {
+        concise: 'Keep responses brief and to the point.',
+        detailed: 'Provide thorough, comprehensive explanations.',
+        'step-by-step': 'Break down explanations into clear, numbered steps.',
+      };
+      personalizedPrompt += responseStyles[preferences.responseStyle] + '\n';
+      
+      // Tone
+      const tones: Record<string, string> = {
+        formal: 'Maintain a professional and formal tone.',
+        casual: 'Use a friendly, conversational tone.',
+        encouraging: 'Be supportive, encouraging, and positive.',
+      };
+      personalizedPrompt += tones[preferences.tone] + '\n';
+      
+      // Memory context
+      if (memory.topics && memory.topics.length > 0) {
+        const recentTopics = memory.topics.slice(-10);
+        personalizedPrompt += `\nTopics ${name} has recently studied: ${recentTopics.join(', ')}. You can reference these and build upon prior knowledge.\n`;
+      }
+      if (memory.strengths && memory.strengths.length > 0) {
+        personalizedPrompt += `Their strengths: ${memory.strengths.join(', ')}. You can reference these when relevant.\n`;
+      }
+      if (memory.weaknesses && memory.weaknesses.length > 0) {
+        personalizedPrompt += `They need extra help with: ${memory.weaknesses.join(', ')}. Provide more detailed explanations for these topics.\n`;
+      }
+      if (memory.recentQuestions && memory.recentQuestions.length > 0) {
+        const recentQ = memory.recentQuestions.slice(0, 5);
+        personalizedPrompt += `\nRecent questions ${name} asked: ${recentQ.map(q => `"${q.substring(0, 50)}..."`).join('; ')}. Consider this context when answering.\n`;
+      }
+      if (memory.notes) {
+        personalizedPrompt += `\nAdditional notes about the student: ${memory.notes}\n`;
+      }
+      
+      personalizedPrompt += '--- END PERSONALIZATION ---\n';
+    }
+    
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: personalizedPrompt },
     ];
 
-    // Add conversation history (last 10 messages to avoid token limits)
     const recentHistory = conversationHistory.slice(-10);
-    console.log(`[CHAT:${requestId}] 📜 Adding ${recentHistory.length} messages from history`);
     for (const msg of recentHistory) {
       messages.push({ role: msg.role, content: msg.content });
     }
 
-    // Add current question with context
-    const userMessageContent = `Course Materials:\n${context}\n\nStudent Question: ${message}`;
-    messages.push({
-      role: 'user',
-      content: userMessageContent,
-    });
+    let userMessageContent: string;
     
-    console.log(`[CHAT:${requestId}] ✅ Messages array built: ${messages.length} total messages`);
-    console.log(`[CHAT:${requestId}] 📊 Total message content length: ${userMessageContent.length} chars`);
+    if (hasMaterials) {
+      userMessageContent = `
+=== AVAILABLE COURSE MATERIALS (${fileCount} files) ===
+Files loaded: ${fileNames.join(', ')}
 
-    // Create streaming response
+${context}
+
+=== END OF COURSE MATERIALS ===
+
+Student Question: ${message}
+
+Instructions: 
+1. Search through ALL the course materials above to find relevant information
+2. The materials include ${fileCount} files: ${fileNames.join(', ')}
+3. If the answer is found, provide a complete response with citations (mention which file the information came from)
+4. If you cannot find the specific information after checking all files, let the student know and suggest they upload the relevant materials`;
+    } else {
+      userMessageContent = `Note: ${allMaterials}\n\nStudent Question: ${message}\n\nPlease inform the user that no course materials are available and they need to upload materials first.`;
+    }
+    messages.push({ role: 'user', content: userMessageContent });
+
     console.log(`[CHAT:${requestId}] 🌊 Creating streaming response...`);
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          console.log(`[CHAT:${requestId}] 🤖 Initializing Portkey client...`);
-          console.log(`[CHAT:${requestId}]   Model: ${AI_MODEL}`);
-          console.log(`[CHAT:${requestId}]   Base URL: ${process.env.PORTKEY_BASE_URL || 'default'}`);
-          console.log(`[CHAT:${requestId}]   API Key: ${process.env.PORTKEY_API_KEY ? '✓ Set' : '✗ Missing'}`);
+          console.log(`[CHAT:${requestId}] 🤖 Connecting to AI Gateway...`);
+          console.log(`[CHAT:${requestId}]   Model: ${modelToUse}`);
+          console.log(`[CHAT:${requestId}]   Gateway: ${process.env.PORTKEY_BASE_URL || 'Portkey Cloud'}`);
           
           let response: any;
           
           try {
-            // Try using Portkey SDK first
-            console.log(`[CHAT:${requestId}] 🔌 Attempting Portkey SDK connection...`);
-            const sdkStart = Date.now();
             const portkey = await getPortkeyClient();
-            const sdkInitDuration = Date.now() - sdkStart;
-            console.log(`[CHAT:${requestId}] ✅ Portkey client initialized (${sdkInitDuration}ms)`);
-            console.log(`[CHAT:${requestId}] 📡 Making API call via SDK...`);
-            
-            const apiStart = Date.now();
             response = await portkey.chat.completions.create({
-              model: AI_MODEL,
+              model: modelToUse,
               messages: messages as any,
-              max_tokens: 1500,
+              max_tokens: 4000,
               temperature: 0.3,
               stream: true,
             });
-            const apiDuration = Date.now() - apiStart;
-            
-            console.log(`[CHAT:${requestId}] ✅ Portkey SDK call successful (${apiDuration}ms)`);
-            console.log(`[CHAT:${requestId}] 🌊 Starting stream...`);
+            console.log(`[CHAT:${requestId}] ✅ Connected via SDK`);
           } catch (sdkError: any) {
-            // If SDK fails, try direct fetch as fallback
-            console.error(`[CHAT:${requestId}] ⚠️  Portkey SDK error:`, sdkError?.message || 'Unknown error');
-            console.error(`[CHAT:${requestId}] SDK error details:`, {
-              message: sdkError?.message,
-              status: sdkError?.status,
-              cause: sdkError?.cause?.code || sdkError?.cause?.message,
-              stack: sdkError?.stack?.substring(0, 500),
-            });
+            console.error(`[CHAT:${requestId}] ⚠️  SDK error:`, sdkError?.message);
             
-            // Check if it's a network/connectivity error
             const isNetworkError = 
               sdkError?.message?.includes('fetch failed') || 
               sdkError?.message?.includes('Cannot connect') ||
-              sdkError?.message?.includes('instantiate') ||
-              sdkError?.message?.includes('ECONNREFUSED') ||
-              sdkError?.message?.includes('ENOTFOUND') ||
-              sdkError?.message?.includes('timeout') ||
-              sdkError?.cause?.code === 'UND_ERR_CONNECT' ||
-              sdkError?.cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
-              sdkError?.status === 404 || 
-              sdkError?.message?.includes('not found');
+              sdkError?.cause?.code === 'UND_ERR_CONNECT';
             
             if (isNetworkError) {
-              console.log(`[CHAT:${requestId}] 🔄 Network error detected, trying direct fetch fallback...`);
-              console.log(`[CHAT:${requestId}] Error type: ${sdkError?.cause?.code || 'unknown'}`);
-              console.log(`[CHAT:${requestId}] This might indicate NYU gateway is not accessible from Vercel`);
+              console.log(`[CHAT:${requestId}] 🔄 Trying direct fetch...`);
               
               const apiKey = process.env.PORTKEY_API_KEY;
-              // Use NYU gateway (matching Python example)
               const baseURL = process.env.PORTKEY_BASE_URL || "https://ai-gateway.apps.cloud.rt.nyu.edu/v1";
-              const url = `${baseURL}/chat/completions`;
               
-              console.log(`[CHAT:${requestId}] 🔗 Direct fetch URL: ${url}`);
-              console.log(`[CHAT:${requestId}] 🔑 API Key: ${apiKey ? apiKey.substring(0, 10) + '...' : 'MISSING'}`);
-              console.log(`[CHAT:${requestId}] 🌍 Environment: ${process.env.VERCEL ? 'Vercel' : 'Local'}`);
-              console.log(`[CHAT:${requestId}] 📍 Region: ${process.env.VERCEL_REGION || 'unknown'}`);
+              const fetchResponse = await fetch(`${baseURL}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${apiKey}`,
+                },
+                body: JSON.stringify({
+                  model: modelToUse,
+                  messages: messages,
+                  max_tokens: 4000,
+                  temperature: 0.3,
+                  stream: true,
+                }),
+                signal: AbortSignal.timeout(90000), // Increased timeout
+              });
               
-              const fetchStart = Date.now();
+              if (!fetchResponse.ok) {
+                const errorText = await fetchResponse.text();
+                throw new Error(`API error (${fetchResponse.status}): ${errorText.substring(0, 200)}`);
+              }
               
-              // Add timeout and better error handling for Vercel
-              const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+              if (!fetchResponse.body) {
+                throw new Error('No response body');
+              }
               
-              try {
-                const fetchResponse = await fetch(url, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`,
-                  },
-                  body: JSON.stringify({
-                    model: AI_MODEL,
-                    messages: messages,
-                    max_tokens: 1500,
-                    temperature: 0.3,
-                    stream: true,
-                  }),
-                  signal: controller.signal,
-                });
-                
-                clearTimeout(timeoutId);
-              
-                const fetchDuration = Date.now() - fetchStart;
-                
-                if (!fetchResponse.ok) {
-                  const errorText = await fetchResponse.text();
-                  console.error(`[CHAT:${requestId}] ❌ Direct fetch failed: ${fetchResponse.status} (${fetchDuration}ms)`);
-                  console.error(`[CHAT:${requestId}] Error response: ${errorText.substring(0, 500)}`);
-                  throw new Error(`Direct fetch failed (${fetchResponse.status}): ${errorText.substring(0, 200)}`);
-                }
-                
-                if (!fetchResponse.body) {
-                  console.error(`[CHAT:${requestId}] ❌ No response body from direct fetch`);
-                  throw new Error('No response body from direct fetch');
-                }
-                
-                console.log(`[CHAT:${requestId}] ✅ Direct fetch successful (${fetchDuration}ms)`);
-                console.log(`[CHAT:${requestId}] 🌊 Converting to stream...`);
-              
-              // Convert fetch response to async iterator compatible with Portkey SDK format
               const reader = fetchResponse.body.getReader();
               const decoder = new TextDecoder();
-              let chunkCount = 0;
               
               response = {
                 async *[Symbol.asyncIterator]() {
@@ -316,7 +428,6 @@ export async function POST(req: NextRequest) {
                     const { done, value } = await reader.read();
                     if (done) break;
                     
-                    chunkCount++;
                     const chunk = decoder.decode(value, { stream: true });
                     const lines = chunk.split('\n');
                     
@@ -329,13 +440,13 @@ export async function POST(req: NextRequest) {
                             yield { 
                               choices: [{ 
                                 delta: { 
-                                  content: data.choices?.[0]?.delta?.content || data.choices?.[0]?.message?.content || '' 
+                                  content: data.choices?.[0]?.delta?.content || '' 
                                 } 
                               }] 
                             };
                           }
                         } catch (e) {
-                          // Skip invalid JSON lines
+                          // Skip invalid JSON
                         }
                       }
                     }
@@ -343,105 +454,50 @@ export async function POST(req: NextRequest) {
                 }
               };
               
-                console.log(`[CHAT:${requestId}] ✅ Stream converter ready`);
-              } catch (fetchError: any) {
-                clearTimeout(timeoutId);
-                const fetchDuration = Date.now() - fetchStart;
-                
-                console.error(`[CHAT:${requestId}] ❌ Direct fetch error after ${fetchDuration}ms:`, fetchError?.message || 'Unknown');
-                console.error(`[CHAT:${requestId}] Fetch error details:`, {
-                  name: fetchError?.name,
-                  message: fetchError?.message,
-                  cause: fetchError?.cause?.code || fetchError?.cause?.message,
-                  stack: fetchError?.stack?.substring(0, 500),
-                });
-                
-                // Check if it's a network connectivity issue
-                if (fetchError?.name === 'AbortError' || fetchError?.message?.includes('timeout')) {
-                  throw new Error(
-                    `Connection timeout to NYU gateway. This usually means:\n` +
-                    `1. NYU gateway requires VPN/network access\n` +
-                    `2. Vercel IPs are not whitelisted\n` +
-                    `3. Gateway is temporarily unavailable\n\n` +
-                    `Solution: Contact NYU IT to whitelist Vercel IPs or use Portkey Cloud instead.`
-                  );
-                }
-                
-                if (fetchError?.message?.includes('fetch failed') || 
-                    fetchError?.cause?.code === 'UND_ERR_CONNECT' ||
-                    fetchError?.cause?.code === 'ENOTFOUND') {
-                  throw new Error(
-                    `Cannot connect to NYU gateway from Vercel. This usually means:\n` +
-                    `1. NYU gateway is not accessible from Vercel's network\n` +
-                    `2. Gateway requires VPN or specific IP whitelisting\n` +
-                    `3. DNS resolution failed\n\n` +
-                    `Solution: Use Portkey Cloud (https://api.portkey.ai/v1) or contact NYU IT.`
-                  );
-                }
-                
-                throw fetchError;
-              }
+              console.log(`[CHAT:${requestId}] ✅ Connected via direct fetch`);
             } else {
-              // Not a network error, throw original SDK error
               throw sdkError;
             }
           }
           
-          let hasContent = false;
           let totalContentLength = 0;
-          let chunkCount = 0;
 
-          console.log(`[CHAT:${requestId}] 📥 Reading stream chunks...`);
-          const streamStart = Date.now();
-          
           for await (const chunk of response) {
-            chunkCount++;
             const content = chunk.choices?.[0]?.delta?.content || '';
             if (content) {
-              hasContent = true;
               totalContentLength += content.length;
               controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ content })}\n\n`));
             }
           }
           
-          const streamDuration = Date.now() - streamStart;
-          console.log(`[CHAT:${requestId}] ✅ Stream completed: ${chunkCount} chunks, ${totalContentLength} chars (${streamDuration}ms)`);
+          console.log(`[CHAT:${requestId}] ✅ Stream completed: ${totalContentLength} chars`);
 
-          if (!hasContent) {
-            console.warn(`[CHAT:${requestId}] ⚠️  No content received from Portkey API`);
+          if (totalContentLength === 0) {
             controller.enqueue(
-              new TextEncoder().encode(`data: ${JSON.stringify({ error: 'No response from AI. Please check your Portkey configuration and try again.' })}\n\n`)
+              new TextEncoder().encode(`data: ${JSON.stringify({ error: 'No response from AI. Please try again.' })}\n\n`)
             );
           }
 
           controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
           controller.close();
-          
-          const totalDuration = Date.now() - startTime;
-          console.log(`[CHAT:${requestId}] ⬆️  RESPONSE: 200 OK (Stream) (${totalDuration}ms total)`);
-          console.log(`[CHAT:${requestId}] 📊 Summary: ${totalContentLength} chars, ${chunkCount} chunks\n`);
         } catch (error) {
-          const duration = Date.now() - startTime;
-          console.error(`\n[CHAT:${requestId}] ❌ ERROR in stream handler (${duration}ms)`);
-          console.error(`[CHAT:${requestId}] Error message:`, error instanceof Error ? error.message : String(error));
-          console.error(`[CHAT:${requestId}] Error name:`, error instanceof Error ? error.name : 'Unknown');
-          if (error instanceof Error && error.stack) {
-            console.error(`[CHAT:${requestId}] Stack trace:`, error.stack);
+          console.error(`[CHAT:${requestId}] ❌ ERROR:`, error instanceof Error ? error.message : String(error));
+          
+          let userMessage = error instanceof Error ? error.message : 'Unknown error';
+          
+          // Provide helpful error for network issues
+          if (userMessage.includes('fetch failed') || userMessage.includes('Cannot connect') || userMessage.includes('UND_ERR_CONNECT')) {
+            userMessage = 'Cannot connect to NYU AI Gateway. This usually means the app is deployed outside NYU\'s network. The NYU gateway is only accessible from within NYU\'s network (campus or VPN).';
           }
           
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           controller.enqueue(
-            new TextEncoder().encode(`data: ${JSON.stringify({ 
-              error: `AI Error: ${errorMessage}. Please check your Portkey API key and configuration.` 
-            })}\n\n`)
+            new TextEncoder().encode(`data: ${JSON.stringify({ error: userMessage })}\n\n`)
           );
           controller.close();
-          console.log(`[CHAT:${requestId}] ⬆️  RESPONSE: Error stream sent\n`);
         }
       },
     });
 
-    console.log(`[CHAT:${requestId}] ✅ Streaming response initialized and returned`);
     return new Response(stream, {
       headers: {
         'Content-Type': 'text/event-stream',
@@ -450,26 +506,11 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`\n[CHAT:${requestId}] ❌ ERROR after ${duration}ms`);
-    console.error(`[CHAT:${requestId}] Error message:`, error instanceof Error ? error.message : String(error));
-    console.error(`[CHAT:${requestId}] Error name:`, error instanceof Error ? error.name : 'Unknown');
-    if (error instanceof Error && error.stack) {
-      console.error(`[CHAT:${requestId}] Stack trace:`, error.stack);
-    }
-    console.error(`[CHAT:${requestId}] ⬆️  RESPONSE: 500 Internal Server Error\n`);
+    console.error(`[CHAT:${requestId}] ❌ ERROR:`, error);
     
     return new Response(
-      JSON.stringify({ 
-        error: 'Internal server error',
-        details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : undefined
-      }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      }
+      JSON.stringify({ error: 'Internal server error' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
 }
-
-

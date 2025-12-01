@@ -26,22 +26,17 @@ async function getPortkey(): Promise<any> {
       throw new Error('PORTKEY_API_KEY is not set in environment variables');
     }
     
-    // Use NYU gateway by default (matching Python example)
+    // Use NYU gateway by default, or override with PORTKEY_BASE_URL
+    // For Vercel deployment, you may need to use https://api.portkey.ai/v1
     const baseURL = process.env.PORTKEY_BASE_URL || "https://ai-gateway.apps.cloud.rt.nyu.edu/v1";
     
     // Load Portkey SDK dynamically
     const Portkey = await loadPortkeySDK();
     
-    // Portkey SDK configuration
-    // For NYU gateway, we need to use the baseURL
     const config: any = {
       apiKey: apiKey,
+      baseURL: baseURL,
     };
-    
-    // Add baseURL if provided (for custom gateways like NYU)
-    if (baseURL) {
-      config.baseURL = baseURL;
-    }
     
     console.log('Initializing Portkey client:', {
       baseURL,
@@ -50,27 +45,16 @@ async function getPortkey(): Promise<any> {
     });
     
     try {
-      // Portkey SDK might try to validate connection during initialization
-      // If it fails, we'll catch and provide better error message
       portkeyInstance = new Portkey(config);
       console.log('Portkey client created successfully');
     } catch (error: any) {
       console.error('Failed to create Portkey client:', error);
       
-      // Check if it's a network/fetch error
       if (error?.message?.includes('fetch failed') || error?.cause?.code === 'UND_ERR_CONNECT') {
         throw new Error(
           `Cannot connect to NYU gateway (${baseURL}). ` +
-          `This might mean: 1) Gateway requires VPN/network access, 2) Gateway URL is incorrect, ` +
-          `3) Gateway is temporarily unavailable. Error: ${error.message || 'Network connection failed'}`
-        );
-      }
-      
-      // Check if it's an API key error
-      if (error?.message?.includes('apiKey') || error?.message?.includes('API key')) {
-        throw new Error(
-          `Invalid Portkey API key. Please verify your PORTKEY_API_KEY in Vercel environment variables. ` +
-          `Get your key from: https://app.portkey.ai/api-keys`
+          `This gateway is only accessible from within NYU's network. ` +
+          `If deploying to Vercel, you need to deploy on NYU infrastructure instead.`
         );
       }
       
@@ -81,19 +65,17 @@ async function getPortkey(): Promise<any> {
 }
 
 // Export a function that returns portkey instance (fully lazy - only called at runtime)
-// Now async to support dynamic import
 export async function getPortkeyClient(): Promise<any> {
   return await getPortkey();
 }
 
-// Direct fetch function as fallback if Portkey SDK doesn't work
+// Direct fetch function as fallback
 export async function callPortkeyDirectly(
   messages: Array<{ role: string; content: string }>,
   model: string,
   stream: boolean = false
 ) {
   const apiKey = process.env.PORTKEY_API_KEY;
-  // Use NYU gateway (matching Python example)
   const baseURL = process.env.PORTKEY_BASE_URL || "https://ai-gateway.apps.cloud.rt.nyu.edu/v1";
   
   if (!apiKey) {
@@ -118,7 +100,7 @@ export async function callPortkeyDirectly(
     body: JSON.stringify({
       model,
       messages,
-      max_tokens: 1500,
+      max_tokens: 4000,
       temperature: 0.3,
       stream,
     }),
@@ -132,11 +114,8 @@ export async function callPortkeyDirectly(
   return response;
 }
 
-// Don't export portkey directly - it causes build-time evaluation
-// Always use getPortkeyClient() instead
-
-// Model configuration - can be overridden via environment variable
-export const AI_MODEL = process.env.AI_MODEL || '@vertexai/gemini-2.5-pro';
+// Model configuration - GPT-4o through NYU gateway
+export const AI_MODEL = process.env.AI_MODEL || '@gpt-4o/gpt-4o';
 
 export const SYSTEM_PROMPT = `You are NYU AI Study Buddy, an intelligent academic assistant for NYU Abu Dhabi students across all courses and subjects.
 
@@ -149,8 +128,8 @@ Your role:
 - Assist with homework, projects, and academic writing
 - Clarify course requirements and expectations
 
-Critical rules:
-- ONLY use information from the provided course materials (slides, PDFs, documents, readings)
+Guidelines:
+- Use information from the provided course materials when available
 - Always cite your source clearly (e.g., "According to Lecture 3, slide 5..." or "From Chapter 2 of the textbook...")
 - If information is NOT in the course materials, clearly state: "I don't find that information in the uploaded course materials. Please check your syllabus or consult your professor."
 - Break down complex concepts into simple, digestible explanations with examples
@@ -161,5 +140,3 @@ Critical rules:
 - Maintain academic integrity - help students learn, not cheat
 
 Tone: Professional yet friendly, like an experienced tutor or teaching assistant who is knowledgeable, approachable, and genuinely wants students to succeed academically.`;
-
-

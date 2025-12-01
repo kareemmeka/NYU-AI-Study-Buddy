@@ -7,22 +7,21 @@ export function toast(props: {
   title?: string;
   description?: string;
   variant?: "default" | "destructive" | "success";
+  duration?: number;
 }) {
+  const options = {
+    description: props.description,
+    duration: props.duration || 4000,
+    closeButton: true, // Always show close button
+  };
+
   if (props.variant === "destructive") {
-    return sonnerToast.error(props.title || "Error", {
-      description: props.description,
-    });
+    return sonnerToast.error(props.title || "Error", options);
   }
   if (props.variant === "success") {
-    return sonnerToast.success(props.title || "Success", {
-      description: props.description,
-    });
+    return sonnerToast.success(props.title || "Success", options);
   }
-  return sonnerToast(props.title || "Notification", {
-    description: props.description,
-  });
+  return sonnerToast(props.title || "Notification", options);
 }
 
 export { Toaster } from "sonner";
-
-

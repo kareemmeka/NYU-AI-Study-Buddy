@@ -3,17 +3,51 @@
 import { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { ChatInterface } from '@/components/chat/ChatInterface';
+import { ChatSidebar } from '@/components/chat/ChatSidebar';
 import { FileList } from '@/components/files/FileList';
 import { WelcomeSection } from '@/components/WelcomeSection';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { X, MessageSquare, ArrowRight } from 'lucide-react';
+import { X, MessageSquare, SidebarOpen, SidebarClose } from 'lucide-react';
+import { downloadChatAsText, printChat } from '@/lib/chat-export';
+import { createNewChatSession, deleteChatSession } from '@/lib/chat-history';
+import { getSelectedModel } from '@/lib/models';
+import { toast } from '@/components/ui/toast';
+import { AuthModal } from '@/components/auth/AuthModal';
+import { UserProfile } from '@/components/auth/UserProfile';
+import { SettingsModal } from '@/components/SettingsModal';
+import { HelpContent } from '@/components/HelpContent';
+import { getCurrentUser } from '@/lib/user-auth';
+import { User } from '@/types';
 
 export default function Home() {
   const [showFileManager, setShowFileManager] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
   const [hasFiles, setHasFiles] = useState(false);
+  const [currentChatSessionId, setCurrentChatSessionId] = useState<string | null>(null);
+  const [showChatSidebar, setShowChatSidebar] = useState(true);
+  const [selectedModel, setSelectedModel] = useState<string>('');
+  const [chatKey, setChatKey] = useState(0); // Used to force ChatInterface to reset
+  
+  // User authentication state
+  const [user, setUser] = useState<User | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+
+  // Initialize selected model and user on mount
+  useEffect(() => {
+    setSelectedModel(getSelectedModel());
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+      setUser(currentUser);
+    }
+  }, []);
+
+  const handleModelChange = (modelId: string) => {
+    setSelectedModel(modelId);
+  };
 
   // Check if user has files (but don't auto-show chat on reload)
   useEffect(() => {
@@ -24,7 +58,6 @@ export default function Home() {
           const data = await response.json();
           if (data.files && data.files.length > 0) {
             setHasFiles(true);
-            // Don't auto-show chat - keep welcome page on reload
           }
         }
       } catch (error) {
@@ -32,7 +65,6 @@ export default function Home() {
       }
     };
     checkFiles();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Listen for go-to-chat event
@@ -59,6 +91,45 @@ export default function Home() {
     setShowFileManager(false);
     setShowHelp(false);
     setShowWelcome(false);
+    // Don't create a session - just go to chat view
+    // Session will be created when user sends first message
+  };
+
+  const handleNewChat = () => {
+    // Clear current session - new one will be created on first message
+    setCurrentChatSessionId(null);
+    setChatKey(prev => prev + 1); // Force ChatInterface to reset
+    setShowWelcome(false);
+    setShowFileManager(false);
+    setShowHelp(false);
+  };
+
+  const handleSelectSession = (sessionId: string) => {
+    setCurrentChatSessionId(sessionId);
+    setShowWelcome(false);
+    setShowFileManager(false);
+    setShowHelp(false);
+  };
+
+  const handleDeleteSession = (sessionId: string) => {
+    deleteChatSession(sessionId);
+    toast({
+      title: 'Chat Deleted',
+      description: 'The chat has been deleted successfully.',
+      variant: 'success',
+    });
+    // If we deleted the current chat, just clear it (don't create new one)
+    if (currentChatSessionId === sessionId) {
+      setCurrentChatSessionId(null);
+    }
+  };
+
+  const handleExportChat = (sessionId: string) => {
+    downloadChatAsText(sessionId);
+  };
+
+  const handlePrintChat = (sessionId: string) => {
+    printChat(sessionId);
   };
 
   const handleGoToUpload = () => {
@@ -76,10 +147,22 @@ export default function Home() {
   const handleCloseModal = () => {
     setShowHelp(false);
     setShowFileManager(false);
-    // If no files, show welcome; otherwise show chat
     if (!hasFiles) {
       setShowWelcome(true);
     }
+  };
+
+  // Auth handlers
+  const handleAuthSuccess = (newUser: User) => {
+    setUser(newUser);
+  };
+
+  const handleUserUpdate = (updatedUser: User | null) => {
+    setUser(updatedUser);
+  };
+
+  const handleSignOut = () => {
+    setUser(null);
   };
 
   return (
@@ -89,29 +172,79 @@ export default function Home() {
         onHelpClick={() => setShowHelp(true)}
         onChatClick={handleGoToChat}
         onHomeClick={handleGoToHome}
+        onSettingsClick={() => setShowSettingsModal(true)}
+        onModelChange={handleModelChange}
+        user={user}
+        onSignInClick={() => setShowAuthModal(true)}
+        onProfileClick={() => setShowProfileModal(true)}
+        onSignOut={handleSignOut}
       />
       
       <main className="flex-1 overflow-hidden relative">
+        {/* Auth Modal */}
+        <AuthModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          onAuthSuccess={handleAuthSuccess}
+        />
+
+        {/* Profile Modal */}
+        {user && (
+          <UserProfile
+            isOpen={showProfileModal}
+            onClose={() => setShowProfileModal(false)}
+            user={user}
+            onUserUpdate={handleUserUpdate}
+          />
+        )}
+
+        {/* Settings Modal */}
+        <SettingsModal
+          isOpen={showSettingsModal}
+          onClose={() => setShowSettingsModal(false)}
+        />
+
         {/* Help Modal */}
         {showHelp && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <Card className="w-full max-w-4xl max-h-[90vh] overflow-auto bg-white dark:bg-gray-900 shadow-2xl">
-              <div className="sticky top-0 bg-white dark:bg-gray-900 border-b p-6 flex items-center justify-between z-10">
-                <h2 className="text-3xl font-bold text-[#57068C] dark:text-purple-400">
-                  How It Works
-                </h2>
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={handleCloseModal}
+          >
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <Card 
+              className="relative w-full max-w-2xl max-h-[85vh] overflow-hidden bg-white dark:bg-gray-900 shadow-2xl border-0 rounded-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 px-6 py-5 flex items-center justify-between z-10">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    How It Works
+                  </h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Everything you need to know
+                  </p>
+                </div>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={handleCloseModal}
-                  className="rounded-full"
+                  className="rounded-full h-10 w-10 hover:bg-gray-100 dark:hover:bg-gray-800"
                   aria-label="Close help"
                 >
                   <X className="h-5 w-5" />
                 </Button>
               </div>
-              <div className="p-8">
-                <WelcomeSection onGetStarted={handleGetStarted} />
+              <div className="p-6 overflow-y-auto max-h-[calc(85vh-88px)]">
+                <HelpContent 
+                  onGetStarted={() => {
+                    handleCloseModal();
+                    handleGetStarted();
+                  }} 
+                  onStartChat={() => {
+                    handleCloseModal();
+                    handleGoToChat();
+                  }}
+                />
               </div>
             </Card>
           </div>
@@ -162,25 +295,103 @@ export default function Home() {
           </div>
         )}
 
-        {/* Main Content - Only show when modals are closed */}
-        {!showHelp && !showFileManager && (
-          showWelcome ? (
-            <div className="h-full overflow-auto">
-              <div className="min-h-full flex items-center justify-center py-12">
-                <WelcomeSection onGetStarted={handleGetStarted} />
-              </div>
+        {/* Main Content */}
+        {showWelcome && !showHelp && !showFileManager ? (
+          <div className="h-full overflow-auto">
+            <div className="min-h-full flex items-center justify-center py-12">
+              <WelcomeSection onGetStarted={handleGetStarted} />
             </div>
-          ) : (
-            <div className="h-full flex flex-col max-w-5xl mx-auto w-full" style={{ height: '100%', minHeight: 0 }}>
+          </div>
+        ) : (
+          <div className="h-full flex" style={{ height: '100%', minHeight: 0 }}>
+            {/* Chat Sidebar */}
+            {showChatSidebar && (
+              <div className="hidden md:block">
+                <ChatSidebar
+                  currentSessionId={currentChatSessionId}
+                  onSelectSession={handleSelectSession}
+                  onNewChat={handleNewChat}
+                  onDeleteSession={handleDeleteSession}
+                  onExportChat={handleExportChat}
+                  onPrintChat={handlePrintChat}
+                />
+              </div>
+            )}
+            
+            {/* Chat Interface */}
+            <div className="flex-1 flex flex-col min-w-0" style={{ height: '100%', minHeight: 0 }}>
+              {/* Sidebar Toggle */}
+              <div className="p-2 border-b border-purple-200 dark:border-purple-800 flex items-center">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowChatSidebar(!showChatSidebar)}
+                  className="md:hidden"
+                  title="Toggle Sidebar"
+                >
+                  {showChatSidebar ? <SidebarClose className="h-5 w-5" /> : <SidebarOpen className="h-5 w-5" />}
+                </Button>
+                {showChatSidebar && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowChatSidebar(false)}
+                    className="hidden md:flex"
+                    title="Hide Sidebar"
+                  >
+                    <SidebarClose className="h-5 w-5" />
+                  </Button>
+                )}
+                {!showChatSidebar && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowChatSidebar(true)}
+                    className="hidden md:flex"
+                    title="Show Sidebar"
+                  >
+                    <SidebarOpen className="h-5 w-5" />
+                  </Button>
+                )}
+              </div>
+              
               <div className="flex-1 min-h-0 overflow-hidden p-6" style={{ height: '100%', minHeight: 0 }}>
-                <ChatInterface />
+                <ChatInterface 
+                  key={chatKey}
+                  sessionId={currentChatSessionId}
+                  onSessionChange={setCurrentChatSessionId}
+                  selectedModel={selectedModel}
+                  onModelChange={handleModelChange}
+                  user={user}
+                />
               </div>
             </div>
-          )
+
+            {/* Mobile Sidebar Overlay */}
+            {showChatSidebar && (
+              <div className="md:hidden fixed inset-0 z-40">
+                <div className="absolute inset-0 bg-black/50" onClick={() => setShowChatSidebar(false)} />
+                <div className="absolute left-0 top-0 bottom-0 w-80 bg-white dark:bg-gray-900">
+                  <ChatSidebar
+                    currentSessionId={currentChatSessionId}
+                    onSelectSession={(id) => {
+                      handleSelectSession(id);
+                      setShowChatSidebar(false);
+                    }}
+                    onNewChat={() => {
+                      handleNewChat();
+                      setShowChatSidebar(false);
+                    }}
+                    onDeleteSession={handleDeleteSession}
+                    onExportChat={handleExportChat}
+                    onPrintChat={handlePrintChat}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </main>
     </div>
   );
 }
-
-

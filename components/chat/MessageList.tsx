@@ -1,17 +1,17 @@
 "use client";
 
-import { Message as MessageType } from '@/types';
+import { Message as MessageType, User } from '@/types';
 import { Message } from './Message';
 import { TypingIndicator } from './TypingIndicator';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { useEffect, useRef } from 'react';
 
 interface MessageListProps {
   messages: MessageType[];
   isTyping: boolean;
+  user?: User | null;
 }
 
-export function MessageList({ messages, isTyping }: MessageListProps) {
+export function MessageList({ messages, isTyping, user }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -19,7 +19,6 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
     const scrollToBottom = () => {
       if (scrollRef.current) {
         const element = scrollRef.current;
-        // Use scrollIntoView for better compatibility
         element.scrollTop = element.scrollHeight;
       }
     };
@@ -37,9 +36,18 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
     };
   }, [messages, isTyping]);
 
+  // Get personalized greeting
+  const getGreeting = () => {
+    if (user) {
+      const firstName = user.name.split(' ')[0];
+      return `Welcome, ${firstName}!`;
+    }
+    return 'Ready to Get Started?';
+  };
+
   return (
     <div 
-      className="flex-1 overflow-y-auto overflow-x-hidden px-4" 
+      className="flex-1 overflow-y-auto overflow-x-hidden px-4 md:px-6" 
       ref={scrollRef}
       data-message-list
       style={{ 
@@ -47,24 +55,26 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
         maxHeight: '100%',
         overflowY: 'auto',
         overflowX: 'hidden',
-        WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
+        WebkitOverflowScrolling: 'touch',
         scrollBehavior: 'smooth',
         position: 'relative'
       }}
     >
-      <div className="py-4">
+      <div className="py-6 max-w-4xl mx-auto">
         {messages.length === 0 && !isTyping && (
-          <div className="text-center py-8">
-            <div className="max-w-3xl mx-auto space-y-6">
-              <div className="space-y-2">
-                <h3 className="text-2xl font-bold text-[#57068C] dark:text-purple-400">
-                  Ready to Get Started?
+          <div className="text-center py-12">
+            <div className="max-w-3xl mx-auto space-y-8">
+              <div className="space-y-3">
+                <h3 className="text-3xl font-bold text-[#57068C] dark:text-purple-400">
+                  {getGreeting()}
                 </h3>
-                <p className="text-muted-foreground">
-                  Ask a question about your course materials or try one of these examples:
+                <p className="text-gray-600 dark:text-gray-400 text-lg">
+                  {user 
+                    ? `Ask anything about your course materials, ${user.name.split(' ')[0]}!`
+                    : 'Ask a question about your course materials or try one of these examples:'}
                 </p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl mx-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
                 {[
                   "What are the main topics covered in this course?",
                   "Explain the key concepts from the latest lecture",
@@ -75,7 +85,7 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
                 ].map((question, idx) => (
                   <button
                     key={idx}
-                    className="text-left p-4 rounded-xl border-2 border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800 hover:border-[#57068C] hover:bg-purple-50 dark:hover:bg-purple-950/20 transition-all text-sm font-medium shadow-sm hover:shadow-md group"
+                    className="text-left p-5 rounded-xl bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 hover:border-[#57068C] hover:bg-purple-50/50 dark:hover:bg-purple-950/30 transition-all text-sm font-medium shadow-sm hover:shadow-lg group backdrop-blur-sm"
                     onClick={() => {
                       if (typeof window !== 'undefined') {
                         const event = new CustomEvent('example-question', { detail: question });
@@ -83,7 +93,7 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
                       }
                     }}
                   >
-                    <span className="group-hover:text-[#57068C] dark:group-hover:text-purple-400 transition-colors">
+                    <span className="group-hover:text-[#57068C] dark:group-hover:text-purple-400 transition-colors text-gray-700 dark:text-gray-300">
                       {question}
                     </span>
                   </button>
@@ -100,4 +110,3 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
     </div>
   );
 }
-

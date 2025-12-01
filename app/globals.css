@@ -104,4 +104,33 @@
   }
 }
 
+/* Subtle floating animation for decorative icons (optional utility) */
+@keyframes float-soft {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.animate-float-soft {
+  animation: float-soft 4s ease-in-out infinite;
+}
+
+/* Toast close button - move to right side */
+[data-sonner-toast] [data-close-button] {
+  position: absolute !important;
+  right: 8px !important;
+  left: auto !important;
+  top: 8px !important;
+}
+
+[data-sonner-toast] {
+  padding-right: 36px !important;
+}
+
 

@@ -140,8 +140,8 @@ export async function listFiles(): Promise<FileMetadata[]> {
   }
 }
 
-export async function deleteFile(fileId: string): Promise<void> {
-  console.log(`[STORAGE] Deleting file: ${fileId}`);
+export async function deleteFile(fileId: string, fileUrl?: string): Promise<void> {
+  console.log(`[STORAGE] Deleting file: ${fileId}${fileUrl ? ` (URL: ${fileUrl})` : ''}`);
   
   // Support Files_READ_WRITE_TOKEN (Vercel's default) and BLOB_READ_WRITE_TOKEN
   const token = process.env.Files_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
@@ -152,15 +152,49 @@ export async function deleteFile(fileId: string): Promise<void> {
   }
 
   try {
-    await del(fileId, {
+    // Vercel Blob del() can accept either a URL or a pathname
+    // Prefer URL if provided (more reliable), otherwise use fileId
+    let deleteTarget = fileUrl || fileId;
+    
+    // If we have a URL, use it directly (most reliable)
+    if (fileUrl) {
+      console.log(`[STORAGE] Using provided URL for deletion: ${fileUrl}`);
+      deleteTarget = fileUrl;
+    } else if (fileId.startsWith('/')) {
+      // If fileId is a pathname (starts with /), try to find the URL
+      console.log(`[STORAGE] File ID is a pathname, looking up URL...`);
+      const { blobs } = await list({
+        token: token,
+      });
+      
+      const matchingBlob = blobs.find(blob => blob.pathname === fileId);
+      if (matchingBlob) {
+        deleteTarget = matchingBlob.url;
+        console.log(`[STORAGE] Found matching blob, using URL: ${deleteTarget}`);
+      } else {
+        // If not found by pathname, try using the pathname directly
+        console.log(`[STORAGE] Blob not found by pathname, trying pathname directly`);
+        deleteTarget = fileId;
+      }
+    } else if (fileId.startsWith('http')) {
+      // If fileId is already a URL, use it directly
+      console.log(`[STORAGE] File ID is already a URL, using directly`);
+      deleteTarget = fileId;
+    }
+    
+    console.log(`[STORAGE] Attempting to delete with target: ${deleteTarget}`);
+    await del(deleteTarget, {
       token: token,
     });
-    console.log(`[STORAGE] Successfully deleted file: ${fileId}`);
+    console.log(`[STORAGE] ✅ Successfully deleted file: ${fileId} (target: ${deleteTarget})`);
   } catch (error) {
-    console.error(`[STORAGE] Error deleting file ${fileId}:`, error);
+    console.error(`[STORAGE] ❌ Error deleting file ${fileId}:`, error);
     console.error('[STORAGE] Error details:', {
       message: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
+      fileId,
+      fileUrl,
+      deleteTarget: fileUrl || fileId,
     });
     throw error;
   }

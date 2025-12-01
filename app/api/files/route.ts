@@ -61,8 +61,9 @@ export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const fileId = searchParams.get('id');
+    const fileUrl = searchParams.get('url');
 
-    console.log(`[FILES:${requestId}] 🗑️  Delete request for file ID: ${fileId}`);
+    console.log(`[FILES:${requestId}] 🗑️  Delete request for file ID: ${fileId}${fileUrl ? `, URL: ${fileUrl}` : ''}`);
 
     if (!fileId) {
       const duration = Date.now() - startTime;
@@ -76,7 +77,8 @@ export async function DELETE(req: NextRequest) {
 
     console.log(`[FILES:${requestId}] 🚀 Deleting file...`);
     const deleteStart = Date.now();
-    await deleteFile(fileId);
+    // Pass URL if available for more reliable deletion
+    await deleteFile(fileId, fileUrl || undefined);
     const deleteDuration = Date.now() - deleteStart;
     const totalDuration = Date.now() - startTime;
     

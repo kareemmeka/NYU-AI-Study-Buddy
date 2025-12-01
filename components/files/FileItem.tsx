@@ -1,23 +1,26 @@
 "use client";
 
 import { FileMetadata } from '@/types';
-import { File, Trash2, Download } from 'lucide-react';
+import { File, Trash2, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatFileSize, formatDate, getFileType } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 
 interface FileItemProps {
   file: FileMetadata;
-  onDelete: (id: string) => void;
+  onDelete: (id: string, url?: string) => void;
+  isDeleting?: boolean;
 }
 
-export function FileItem({ file, onDelete }: FileItemProps) {
+export function FileItem({ file, onDelete, isDeleting }: FileItemProps) {
   const fileType = getFileType(file.name);
 
   return (
-    <Card className="p-5 hover:shadow-lg transition-all border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800">
+    <Card className={`p-5 transition-all duration-200 border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800 ${
+      isDeleting ? 'opacity-50' : 'hover:shadow-lg hover:-translate-y-0.5'
+    }`}>
       <div className="flex items-start gap-4">
-        <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-[#57068C] flex items-center justify-center shadow-md">
+        <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-[#57068C] flex items-center justify-center shadow-md transition-transform duration-200 group-hover:scale-110">
           <File className="h-6 w-6 text-white" />
         </div>
         <div className="flex-1 min-w-0">
@@ -43,22 +46,26 @@ export function FileItem({ file, onDelete }: FileItemProps) {
             }}
             className="h-8 w-8"
             aria-label="Download file"
+            disabled={isDeleting}
           >
             <Download className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => onDelete(file.id)}
+            onClick={() => onDelete(file.id, file.url)}
             className="h-8 w-8 text-destructive hover:text-destructive"
             aria-label="Delete file"
+            disabled={isDeleting}
           >
-            <Trash2 className="h-4 w-4" />
+            {isDeleting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
           </Button>
         </div>
       </div>
     </Card>
   );
 }
-
-
