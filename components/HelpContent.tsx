@@ -9,9 +9,10 @@ import { getCurrentUser } from '@/lib/user-auth';
 interface HelpContentProps {
   onGetStarted?: () => void;
   onStartChat?: () => void;
+  onViewAnalytics?: () => void;
 }
 
-export function HelpContent({ onGetStarted, onStartChat }: HelpContentProps) {
+export function HelpContent({ onGetStarted, onStartChat, onViewAnalytics }: HelpContentProps) {
   const user = getCurrentUser();
   const role = getUserRole();
   // Only show role-specific content if user is signed in AND has a role selected
@@ -302,7 +303,7 @@ export function HelpContent({ onGetStarted, onStartChat }: HelpContentProps) {
             Create Course
           </Button>
           <Button 
-            onClick={onStartChat}
+            onClick={onViewAnalytics}
             variant="outline"
             className="flex-1 h-12 rounded-xl border-2"
           >

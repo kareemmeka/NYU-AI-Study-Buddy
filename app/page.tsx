@@ -122,19 +122,22 @@ export default function Home() {
     // Different behavior based on role
     if (userRole === 'professor') {
       // Professors go to course management
-      setShowFileManager(false);
+      setShowFileManager(true);
       setShowWelcome(false);
       setShowHelp(false);
+      setShowAnalytics(false);
     } else if (userRole === 'student') {
       // Students go to course selection
       setShowFileManager(true);
       setShowWelcome(false);
       setShowHelp(false);
+      setShowAnalytics(false);
     } else {
       // Not signed in - will trigger role selection
       setShowFileManager(false);
       setShowWelcome(false);
       setShowHelp(false);
+      setShowAnalytics(false);
     }
   };
 
@@ -148,10 +151,8 @@ export default function Home() {
   };
   
   const handleOpenAnalytics = () => {
+    // Open analytics modal without changing the underlying view
     setShowAnalytics(true);
-    setShowWelcome(false);
-    setShowHelp(false);
-    setShowFileManager(false);
   };
 
   const handleNewChat = () => {
@@ -223,9 +224,8 @@ export default function Home() {
   const handleCloseModal = () => {
     setShowHelp(false);
     setShowFileManager(false);
-    if (!hasFiles) {
-      setShowWelcome(true);
-    }
+    // Don't change the view when closing modals
+    // Just close the modal and stay on current view
   };
 
   // Auth handlers
@@ -388,6 +388,23 @@ export default function Home() {
                     handleCloseModal();
                     handleGoToChat();
                   }}
+                  onViewAnalytics={() => {
+                    const currentRole = getUserRole();
+                    if (!currentRole || currentRole !== 'professor') {
+                      toast({
+                        title: 'Professor Access Only',
+                        description: 'Analytics are only available for professors',
+                      });
+                      return;
+                    }
+                    if (!user) {
+                      handleCloseModal();
+                      setShowAuthModal(true);
+                      return;
+                    }
+                    handleCloseModal();
+                    handleOpenAnalytics();
+                  }}
                 />
               </div>
             </Card>
@@ -496,11 +513,13 @@ export default function Home() {
           </div>
         )}
 
-        {/* Professor Analytics Modal */}
-        <ProfessorAnalytics
-          isOpen={showAnalytics}
-          onClose={() => setShowAnalytics(false)}
-        />
+        {/* Professor Analytics Modal - Always render above other content */}
+        {showAnalytics && (
+          <ProfessorAnalytics
+            isOpen={showAnalytics}
+            onClose={() => setShowAnalytics(false)}
+          />
+        )}
 
         {/* Main Content */}
         {showWelcome && !showHelp && !showFileManager && !showAnalytics ? (
