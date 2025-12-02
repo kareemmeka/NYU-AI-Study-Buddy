@@ -4,6 +4,7 @@ import { Message as MessageType, User } from '@/types';
 import { Message } from './Message';
 import { TypingIndicator } from './TypingIndicator';
 import { useEffect, useRef } from 'react';
+import { getUserRole } from '@/lib/course-management';
 
 interface MessageListProps {
   messages: MessageType[];
@@ -13,6 +14,9 @@ interface MessageListProps {
 
 export function MessageList({ messages, isTyping, user }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const role = getUserRole();
+  // Only show professor-specific content if user is signed in AND has professor role
+  const isProfessor = user && role === 'professor';
 
   useEffect(() => {
     // Scroll to bottom when messages change or typing indicator appears
@@ -40,10 +44,35 @@ export function MessageList({ messages, isTyping, user }: MessageListProps) {
   const getGreeting = () => {
     if (user) {
       const firstName = user.name.split(' ')[0];
+      if (isProfessor) {
+        return `Welcome, Professor ${firstName}!`;
+      }
       return `Welcome, ${firstName}!`;
     }
     return 'Ready to Get Started?';
   };
+
+  // Student example questions
+  const studentQuestions = [
+    "What are the main topics covered in this course?",
+    "Explain the key concepts from the latest lecture",
+    "Summarize the important points from the syllabus",
+    "Generate practice questions for the upcoming exam",
+    "What is the grading breakdown for this course?",
+    "Help me understand a difficult concept step by step",
+  ];
+
+  // Professor example questions
+  const professorQuestions = [
+    "What are the most common questions students ask about this course?",
+    "Generate a quiz on Chapter 5 for my students",
+    "What topics are students struggling with the most?",
+    "Create practice problems based on the uploaded materials",
+    "Show me analytics for student engagement",
+    "What are the peak hours when students ask questions?",
+  ];
+
+  const exampleQuestions = isProfessor ? professorQuestions : studentQuestions;
 
   return (
     <div 
@@ -70,19 +99,14 @@ export function MessageList({ messages, isTyping, user }: MessageListProps) {
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400 text-lg">
                   {user 
-                    ? `Ask anything about your course materials, ${user.name.split(' ')[0]}!`
+                    ? isProfessor
+                      ? `Manage your courses, track student engagement, and generate quizzes, ${user.name.split(' ')[0]}!`
+                      : `Ask anything about your course materials, ${user.name.split(' ')[0]}!`
                     : 'Ask a question about your course materials or try one of these examples:'}
                 </p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
-                {[
-                  "What are the main topics covered in this course?",
-                  "Explain the key concepts from the latest lecture",
-                  "Summarize the important points from the syllabus",
-                  "Generate practice questions for the upcoming exam",
-                  "What is the grading breakdown for this course?",
-                  "Help me understand a difficult concept step by step",
-                ].map((question, idx) => (
+                {exampleQuestions.map((question, idx) => (
                   <button
                     key={idx}
                     className="text-left p-5 rounded-xl bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 hover:border-[#57068C] hover:bg-purple-50/50 dark:hover:bg-purple-950/30 transition-all text-sm font-medium shadow-sm hover:shadow-lg group backdrop-blur-sm"

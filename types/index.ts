@@ -18,10 +18,13 @@ export interface ChatRequest {
   message: string;
   conversationHistory?: Message[];
   model?: string; // Optional: AI model to use
+  courseId?: string; // Optional: Course ID to filter materials
+  fileIds?: string[]; // Optional: Specific file IDs to include (for course filtering)
   user?: {
     name: string;
     preferences: UserPreferences;
     memory: UserMemory;
+    role?: UserRole;
   } | null;
 }
 
@@ -57,6 +60,8 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  password: string; // Hashed password
+  role?: UserRole; // Student or Professor
   createdAt: Date;
   preferences: UserPreferences;
   memory: UserMemory;
@@ -78,4 +83,26 @@ export interface UserMemory {
   recentQuestions: string[]; // Last 20 questions asked
   notes: string; // Custom notes about the user
   lastUpdated: Date;
+}
+
+// User Role Types
+export type UserRole = 'student' | 'professor';
+
+// Course Types
+export interface Course {
+  id: string;
+  name: string;
+  description?: string;
+  professorId: string; // User ID of the professor who created it
+  professorName: string;
+  createdAt: Date;
+  updatedAt: Date;
+  fileIds: string[]; // File IDs associated with this course
+}
+
+export interface CourseFile {
+  courseId: string;
+  fileId: string;
+  fileName: string;
+  uploadedAt: Date;
 }

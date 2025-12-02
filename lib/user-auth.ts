@@ -1,4 +1,16 @@
-import { User, UserPreferences, UserMemory } from '@/types';
+import { User, UserPreferences, UserMemory, UserRole } from '@/types';
+
+// Simple password hashing (for demo - in production use bcrypt or similar)
+function hashPassword(password: string): string {
+  // Simple hash for demo purposes
+  let hash = 0;
+  for (let i = 0; i < password.length; i++) {
+    const char = password.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return hash.toString(36);
+}
 
 const USER_STORAGE_KEY = 'nyu-study-buddy-user';
 const USERS_DB_KEY = 'nyu-study-buddy-users-db';
@@ -69,7 +81,7 @@ function saveCurrentUser(user: User): void {
 }
 
 // Sign up a new user
-export function signUp(name: string, email: string): { success: boolean; user?: User; error?: string } {
+export function signUp(name: string, email: string, password: string, role: UserRole): { success: boolean; user?: User; error?: string } {
   const users = getAllUsers();
   
   // Check if email already exists
@@ -78,10 +90,20 @@ export function signUp(name: string, email: string): { success: boolean; user?: 
     return { success: false, error: 'An account with this email already exists. Please sign in.' };
   }
   
+  if (!password || password.length < 6) {
+    return { success: false, error: 'Password must be at least 6 characters long.' };
+  }
+  
+  if (!role) {
+    return { success: false, error: 'Please select your role (Student or Professor).' };
+  }
+  
   const newUser: User = {
     id: generateUserId(),
     name: name.trim(),
     email: email.toLowerCase().trim(),
+    password: hashPassword(password),
+    role: role,
     createdAt: new Date(),
     preferences: { ...defaultPreferences },
     memory: { ...defaultMemory, lastUpdated: new Date() },
@@ -91,11 +113,18 @@ export function signUp(name: string, email: string): { success: boolean; user?: 
   saveAllUsers(users);
   saveCurrentUser(newUser);
   
+  // Save role to course management
+  if (typeof window !== 'undefined') {
+    import('@/lib/course-management').then(({ setUserRole }) => {
+      setUserRole(role);
+    });
+  }
+  
   return { success: true, user: newUser };
 }
 
 // Sign in existing user
-export function signIn(email: string): { success: boolean; user?: User; error?: string } {
+export function signIn(email: string, password: string): { success: boolean; user?: User; error?: string } {
   const users = getAllUsers();
   
   const user = Object.values(users).find(u => u.email.toLowerCase() === email.toLowerCase().trim());
@@ -103,9 +132,21 @@ export function signIn(email: string): { success: boolean; user?: User; error?: 
     return { success: false, error: 'No account found with this email. Please sign up first.' };
   }
   
+  // Verify password
+  if (!user.password || hashPassword(password) !== user.password) {
+    return { success: false, error: 'Incorrect password. Please try again.' };
+  }
+  
   // Convert dates
   user.createdAt = new Date(user.createdAt);
   user.memory.lastUpdated = new Date(user.memory.lastUpdated);
+  
+  // Load role from user account if available
+  if (user.role && typeof window !== 'undefined') {
+    import('@/lib/course-management').then(({ setUserRole }) => {
+      setUserRole(user.role!);
+    });
+  }
   
   saveCurrentUser(user);
   return { success: true, user };

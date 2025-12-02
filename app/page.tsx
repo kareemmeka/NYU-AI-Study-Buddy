@@ -8,7 +8,7 @@ import { FileList } from '@/components/files/FileList';
 import { WelcomeSection } from '@/components/WelcomeSection';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { X, MessageSquare, SidebarOpen, SidebarClose } from 'lucide-react';
+import { X, MessageSquare, SidebarOpen, SidebarClose, Upload } from 'lucide-react';
 import { downloadChatAsText, printChat } from '@/lib/chat-export';
 import { createNewChatSession, deleteChatSession } from '@/lib/chat-history';
 import { getSelectedModel } from '@/lib/models';
@@ -18,7 +18,12 @@ import { UserProfile } from '@/components/auth/UserProfile';
 import { SettingsModal } from '@/components/SettingsModal';
 import { HelpContent } from '@/components/HelpContent';
 import { getCurrentUser } from '@/lib/user-auth';
-import { User } from '@/types';
+import { User, UserRole } from '@/types';
+import { getUserRole, setUserRole as saveUserRole, getSelectedCourseId } from '@/lib/course-management';
+import { RoleSelectionModal } from '@/components/RoleSelectionModal';
+import { CourseSelector } from '@/components/CourseSelector';
+import { CourseManager } from '@/components/CourseManager';
+import { ProfessorAnalytics } from '@/components/professor/ProfessorAnalytics';
 
 export default function Home() {
   const [showFileManager, setShowFileManager] = useState(false);
@@ -35,14 +40,46 @@ export default function Home() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  
+  // Role management
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [showRoleSelection, setShowRoleSelection] = useState(false);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  
+  // Professor analytics
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
-  // Initialize selected model and user on mount
+  // Initialize selected model, user, and role on mount
   useEffect(() => {
     setSelectedModel(getSelectedModel());
     const currentUser = getCurrentUser();
     if (currentUser) {
       setUser(currentUser);
+      // Load role from user account if available
+      if (currentUser.role) {
+        saveUserRole(currentUser.role);
+        setUserRole(currentUser.role);
+      }
     }
+    
+    // Check for role (but don't show selection automatically)
+    const role = getUserRole();
+    if (role) {
+      setUserRole(role);
+      const courseId = getSelectedCourseId();
+      setSelectedCourseId(courseId);
+    }
+    
+    // Listen for role changes
+    const handleRoleChange = () => {
+      const newRole = getUserRole();
+      setUserRole(newRole);
+      if (newRole) {
+        setShowRoleSelection(false);
+      }
+    };
+    window.addEventListener('role-change', handleRoleChange);
+    return () => window.removeEventListener('role-change', handleRoleChange);
   }, []);
 
   const handleModelChange = (modelId: string) => {
@@ -82,17 +119,39 @@ export default function Home() {
   }, []);
 
   const handleGetStarted = () => {
-    setShowFileManager(true);
-    setShowWelcome(false);
-    setShowHelp(false);
+    // Different behavior based on role
+    if (userRole === 'professor') {
+      // Professors go to course management
+      setShowFileManager(false);
+      setShowWelcome(false);
+      setShowHelp(false);
+    } else if (userRole === 'student') {
+      // Students go to course selection
+      setShowFileManager(true);
+      setShowWelcome(false);
+      setShowHelp(false);
+    } else {
+      // Not signed in - will trigger role selection
+      setShowFileManager(false);
+      setShowWelcome(false);
+      setShowHelp(false);
+    }
   };
 
   const handleGoToChat = () => {
     setShowFileManager(false);
     setShowHelp(false);
     setShowWelcome(false);
+    setShowAnalytics(false);
     // Don't create a session - just go to chat view
     // Session will be created when user sends first message
+  };
+  
+  const handleOpenAnalytics = () => {
+    setShowAnalytics(true);
+    setShowWelcome(false);
+    setShowHelp(false);
+    setShowFileManager(false);
   };
 
   const handleNewChat = () => {
@@ -133,9 +192,26 @@ export default function Home() {
   };
 
   const handleGoToUpload = () => {
-    setShowFileManager(true);
-    setShowHelp(false);
-    setShowWelcome(false);
+    // Different behavior based on role
+    if (userRole === 'professor') {
+      // Professors go to file manager to upload materials
+      setShowFileManager(true);
+      setShowHelp(false);
+      setShowWelcome(false);
+    } else if (userRole === 'student') {
+      // Students go to course selection
+      setShowFileManager(true);
+      setShowHelp(false);
+      setShowWelcome(false);
+    } else {
+      // Not signed in - trigger auth flow
+      const currentRole = getUserRole();
+      if (!currentRole) {
+        setShowRoleSelection(true);
+      } else {
+        setShowAuthModal(true);
+      }
+    }
   };
 
   const handleGoToHome = () => {
@@ -163,6 +239,51 @@ export default function Home() {
 
   const handleSignOut = () => {
     setUser(null);
+    // Clear role so user needs to select again on next sign in
+    saveUserRole(null);
+    setUserRole(null);
+  };
+
+  const handleRoleSelected = (role: UserRole) => {
+    setUserRole(role);
+    setShowRoleSelection(false);
+    // After role selection, show auth modal
+    setShowAuthModal(true);
+  };
+
+  // Listen for auth modal open event
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const handleOpenAuth = () => {
+      // If no role selected, show role selection first
+      const currentRole = getUserRole();
+      if (!currentRole) {
+        setShowRoleSelection(true);
+      } else {
+        setShowAuthModal(true);
+      }
+    };
+
+    window.addEventListener('open-auth-modal' as any, handleOpenAuth);
+    return () => window.removeEventListener('open-auth-modal' as any, handleOpenAuth);
+  }, []);
+
+  const handleCourseSelected = (courseId: string) => {
+    setSelectedCourseId(courseId);
+    // For students, go to chat when course is selected
+    if (userRole === 'student') {
+      handleGoToChat();
+    }
+  };
+
+  const handleCourseCreated = (courseId: string) => {
+    setSelectedCourseId(courseId);
+    // For professors, show file manager after creating course
+    if (userRole === 'professor') {
+      setShowFileManager(true);
+      setShowWelcome(false);
+    }
   };
 
   return (
@@ -175,17 +296,40 @@ export default function Home() {
         onSettingsClick={() => setShowSettingsModal(true)}
         onModelChange={handleModelChange}
         user={user}
-        onSignInClick={() => setShowAuthModal(true)}
+        onSignInClick={() => {
+          // If no role selected, show role selection first
+          const currentRole = getUserRole();
+          if (!currentRole) {
+            setShowRoleSelection(true);
+          } else {
+            setShowAuthModal(true);
+          }
+        }}
         onProfileClick={() => setShowProfileModal(true)}
         onSignOut={handleSignOut}
       />
       
       <main className="flex-1 overflow-hidden relative">
+        {/* Role Selection Modal */}
+        <RoleSelectionModal
+          isOpen={showRoleSelection}
+          onRoleSelected={handleRoleSelected}
+        />
+
         {/* Auth Modal */}
         <AuthModal
           isOpen={showAuthModal}
-          onClose={() => setShowAuthModal(false)}
-          onAuthSuccess={handleAuthSuccess}
+          onClose={() => {
+            setShowAuthModal(false);
+          }}
+          onAuthSuccess={(newUser) => {
+            handleAuthSuccess(newUser);
+            // Role is now set during sign up, so we don't need to show selection again
+            if (newUser.role) {
+              saveUserRole(newUser.role);
+              setUserRole(newUser.role);
+            }
+          }}
         />
 
         {/* Profile Modal */}
@@ -250,17 +394,17 @@ export default function Home() {
           </div>
         )}
 
-        {/* File Manager Modal */}
-        {showFileManager && (
+        {/* File Manager Modal - For Professors */}
+        {showFileManager && userRole === 'professor' && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <Card className="w-full max-w-4xl max-h-[90vh] overflow-auto bg-white dark:bg-gray-900 shadow-2xl">
+            <Card className="w-full max-w-5xl max-h-[90vh] overflow-auto bg-white dark:bg-gray-900 shadow-2xl">
               <div className="sticky top-0 bg-white dark:bg-gray-900 border-b p-6 flex items-center justify-between z-10">
                 <div>
                   <h2 className="text-3xl font-bold text-[#57068C] dark:text-purple-400">
-                    Course Materials
+                    Course Management
                   </h2>
                   <p className="text-muted-foreground mt-1 text-sm">
-                    Upload and manage your course files
+                    Create courses and upload materials for your students
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -284,22 +428,114 @@ export default function Home() {
                   </Button>
                 </div>
               </div>
-              <div className="p-6">
-                <FileList
-                  onFilesChange={() => {
-                    setHasFiles(true);
-                  }}
-                />
+              <div className="p-6 space-y-6">
+                {/* Course Manager */}
+                <div>
+                  <CourseManager 
+                    onCourseCreated={handleCourseCreated}
+                    onCourseSelected={(courseId) => {
+                      setSelectedCourseId(courseId);
+                    }}
+                  />
+                </div>
+                {/* File List for Selected Course */}
+                {selectedCourseId && (
+                  <div className="border-t pt-6">
+                    <h3 className="text-xl font-semibold mb-4">Upload Materials for Selected Course</h3>
+                    <FileList
+                      courseId={selectedCourseId}
+                      onFilesChange={() => {
+                        setHasFiles(true);
+                      }}
+                    />
+                  </div>
+                )}
+                {!selectedCourseId && (
+                  <Card className="p-8 text-center border-2 border-dashed border-gray-300 dark:border-gray-700">
+                    <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-muted-foreground mb-2">
+                      Select a course above to upload materials
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Or create a new course if you haven&apos;t created one yet
+                    </p>
+                  </Card>
+                )}
               </div>
             </Card>
           </div>
         )}
 
+        {/* Course Selection Modal - For Students */}
+        {showFileManager && userRole === 'student' && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <Card className="w-full max-w-2xl max-h-[90vh] overflow-auto bg-white dark:bg-gray-900 shadow-2xl">
+              <div className="sticky top-0 bg-white dark:bg-gray-900 border-b p-6 flex items-center justify-between z-10">
+                <div>
+                  <h2 className="text-3xl font-bold text-[#57068C] dark:text-purple-400">
+                    Select Course
+                  </h2>
+                  <p className="text-muted-foreground mt-1 text-sm">
+                    Choose a course to start asking questions
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleCloseModal}
+                  className="rounded-full"
+                  aria-label="Close course selector"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+              <div className="p-6">
+                <CourseSelector onCourseSelected={handleCourseSelected} />
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Professor Analytics Modal */}
+        <ProfessorAnalytics
+          isOpen={showAnalytics}
+          onClose={() => setShowAnalytics(false)}
+        />
+
         {/* Main Content */}
-        {showWelcome && !showHelp && !showFileManager ? (
+        {showWelcome && !showHelp && !showFileManager && !showAnalytics ? (
           <div className="h-full overflow-auto">
             <div className="min-h-full flex items-center justify-center py-12">
-              <WelcomeSection onGetStarted={handleGetStarted} />
+              <WelcomeSection 
+                onGetStarted={() => {
+                  // First show role selection if no role selected, then auth
+                  const currentRole = getUserRole();
+                  if (!currentRole) {
+                    setShowRoleSelection(true);
+                  } else if (!user) {
+                    // If role selected but not signed in, show auth
+                    setShowAuthModal(true);
+                  } else {
+                    // If both role and user exist, go to file manager
+                    handleGetStarted();
+                  }
+                }}
+                onViewAnalytics={() => {
+                  const currentRole = getUserRole();
+                  if (!currentRole || currentRole !== 'professor') {
+                    toast({
+                      title: 'Professor Access Only',
+                      description: 'Analytics are only available for professors',
+                    });
+                    return;
+                  }
+                  if (!user) {
+                    setShowAuthModal(true);
+                    return;
+                  }
+                  handleOpenAnalytics();
+                }}
+              />
             </div>
           </div>
         ) : (

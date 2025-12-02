@@ -15,8 +15,20 @@ export async function GET(req: NextRequest) {
   console.log(`${'='.repeat(80)}\n`);
   
   try {
-    console.log(`[FILES:${requestId}] 📂 Listing files...`);
-    const files = await listFiles();
+    const { searchParams } = new URL(req.url);
+    const fileIdsParam = searchParams.get('fileIds');
+    
+    console.log(`[FILES:${requestId}] 📂 Listing files...${fileIdsParam ? ` (filtering by ${fileIdsParam.split(',').length} file IDs)` : ''}`);
+    const allFiles = await listFiles();
+    
+    // If fileIds are provided, filter files
+    let files = allFiles;
+    if (fileIdsParam) {
+      const fileIds = fileIdsParam.split(',').filter(id => id.trim());
+      files = allFiles.filter(f => fileIds.includes(f.id));
+      console.log(`[FILES:${requestId}] Filtered to ${files.length} file(s)`);
+    }
+    
     const duration = Date.now() - startTime;
     console.log(`[FILES:${requestId}] ✅ Successfully listed ${files.length} file(s) in ${duration}ms`);
     console.log(`[FILES:${requestId}] ⬆️  RESPONSE: 200 OK (${duration}ms)\n`);

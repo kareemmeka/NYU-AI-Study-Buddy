@@ -10,9 +10,10 @@ import { toast } from '@/components/ui/toast';
 
 interface FileUploadProps {
   onUploadComplete?: () => void;
+  courseId?: string;
 }
 
-export function FileUpload({ onUploadComplete }: FileUploadProps) {
+export function FileUpload({ onUploadComplete, courseId }: FileUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
@@ -55,12 +56,18 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
     }
 
     console.log('[FileUpload] Starting upload of', selectedFiles.length, 'file(s)');
+    if (courseId) {
+      console.log('[FileUpload] Course ID:', courseId);
+    }
     setUploading(true);
     const formData = new FormData();
     selectedFiles.forEach((file, index) => {
       console.log(`[FileUpload] Adding file ${index + 1}:`, file.name, formatFileSize(file.size));
       formData.append('files', file);
     });
+    if (courseId) {
+      formData.append('courseId', courseId);
+    }
 
     try {
       console.log('[FileUpload] Sending request to /api/upload');
@@ -91,6 +98,14 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
           ...file,
           uploadedAt: file.uploadedAt ? new Date(file.uploadedAt) : new Date(),
         }));
+        
+        // Associate files with course on client side
+        if (courseId) {
+          const { addFileToCourse } = await import('@/lib/course-management');
+          filesWithDates.forEach((file: any) => {
+            addFileToCourse(courseId, file.id, file.name);
+          });
+        }
         
         toast({
           title: 'Success',

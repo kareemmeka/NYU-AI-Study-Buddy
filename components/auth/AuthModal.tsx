@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { X, User, Mail, LogIn, UserPlus, Sparkles } from 'lucide-react';
+import { X, User, Mail, LogIn, UserPlus, Sparkles, Lock, GraduationCap } from 'lucide-react';
 import { signIn, signUp } from '@/lib/user-auth';
 import { toast } from '@/components/ui/toast';
-import { User as UserType } from '@/types';
+import { User as UserType, UserRole } from '@/types';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -19,7 +19,19 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Reset form when modal opens/closes
+  useEffect(() => {
+    if (isOpen) {
+      setName('');
+      setEmail('');
+      setPassword('');
+      setSelectedRole(null);
+    }
+  }, [isOpen, mode]);
 
   // Handle escape key
   useEffect(() => {
@@ -39,6 +51,17 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
     setLoading(true);
 
     try {
+      // Validate role selection
+      if (!selectedRole) {
+        toast({ 
+          title: 'Role Required', 
+          description: 'Please select whether you are a Student or Professor', 
+          variant: 'destructive' 
+        });
+        setLoading(false);
+        return;
+      }
+
       if (mode === 'signup') {
         if (!name.trim()) {
           toast({ title: 'Error', description: 'Please enter your name', variant: 'destructive' });
@@ -50,13 +73,18 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
           setLoading(false);
           return;
         }
+        if (!password || password.length < 6) {
+          toast({ title: 'Error', description: 'Password must be at least 6 characters', variant: 'destructive' });
+          setLoading(false);
+          return;
+        }
 
-        const result = signUp(name, email);
+        const result = signUp(name, email, password, selectedRole);
         if (result.success && result.user) {
           const firstName = result.user.name.split(' ')[0];
           toast({ 
             title: `Welcome, ${firstName}!`, 
-            description: 'Your account is ready. The AI will now personalize your experience!', 
+            description: `Your ${selectedRole} account is ready. The AI will now personalize your experience!`, 
             variant: 'success',
             duration: 5000,
           });
@@ -71,8 +99,13 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
           setLoading(false);
           return;
         }
+        if (!password) {
+          toast({ title: 'Error', description: 'Please enter your password', variant: 'destructive' });
+          setLoading(false);
+          return;
+        }
 
-        const result = signIn(email);
+        const result = signIn(email, password);
         if (result.success && result.user) {
           const firstName = result.user.name.split(' ')[0];
           toast({ 
@@ -137,10 +170,55 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Role Selection - Required */}
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                I am a <span className="text-red-500">*</span>
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedRole('student')}
+                  className={`p-4 rounded-xl border-2 transition-all ${
+                    selectedRole === 'student'
+                      ? 'border-[#57068C] bg-purple-50 dark:bg-purple-950/20'
+                      : 'border-gray-200 dark:border-gray-800 hover:border-purple-300 dark:hover:border-purple-700'
+                  }`}
+                >
+                  <GraduationCap className={`h-6 w-6 mx-auto mb-2 ${
+                    selectedRole === 'student' ? 'text-[#57068C]' : 'text-gray-400'
+                  }`} />
+                  <p className={`text-sm font-medium ${
+                    selectedRole === 'student' ? 'text-[#57068C]' : 'text-gray-600 dark:text-gray-400'
+                  }`}>
+                    Student
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedRole('professor')}
+                  className={`p-4 rounded-xl border-2 transition-all ${
+                    selectedRole === 'professor'
+                      ? 'border-[#57068C] bg-purple-50 dark:bg-purple-950/20'
+                      : 'border-gray-200 dark:border-gray-800 hover:border-purple-300 dark:hover:border-purple-700'
+                  }`}
+                >
+                  <User className={`h-6 w-6 mx-auto mb-2 ${
+                    selectedRole === 'professor' ? 'text-[#57068C]' : 'text-gray-400'
+                  }`} />
+                  <p className={`text-sm font-medium ${
+                    selectedRole === 'professor' ? 'text-[#57068C]' : 'text-gray-600 dark:text-gray-400'
+                  }`}>
+                    Professor
+                  </p>
+                </button>
+              </div>
+            </div>
+
             {mode === 'signup' && (
               <div>
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
-                  Your Name
+                  Your Name <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -149,6 +227,7 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
                     placeholder="Enter your name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    required
                     className="h-12 pl-11 rounded-xl border-gray-200 dark:border-gray-700 focus:border-[#57068C] focus:ring-[#57068C]"
                   />
                 </div>
@@ -157,7 +236,7 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
 
             <div>
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
-                Email Address
+                Email Address <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -166,15 +245,37 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
                   placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  required
                   className="h-12 pl-11 rounded-xl border-gray-200 dark:border-gray-700 focus:border-[#57068C] focus:ring-[#57068C]"
                 />
               </div>
             </div>
 
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                Password <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="password"
+                  placeholder={mode === 'signup' ? 'At least 6 characters' : 'Enter your password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={mode === 'signup' ? 6 : undefined}
+                  className="h-12 pl-11 rounded-xl border-gray-200 dark:border-gray-700 focus:border-[#57068C] focus:ring-[#57068C]"
+                />
+              </div>
+              {mode === 'signup' && (
+                <p className="text-xs text-muted-foreground mt-1">Password must be at least 6 characters</p>
+              )}
+            </div>
+
             <Button
               type="submit"
-              disabled={loading}
-              className="w-full h-12 rounded-xl bg-[#57068C] hover:bg-[#6A0BA8] text-white font-medium shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-all duration-300"
+              disabled={loading || !selectedRole}
+              className="w-full h-12 rounded-xl bg-[#57068C] hover:bg-[#6A0BA8] text-white font-medium shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <span className="flex items-center">
@@ -202,7 +303,12 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {mode === 'signin' ? "Don't have an account?" : 'Already have an account?'}
               <button
-                onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
+                type="button"
+                onClick={() => {
+                  setMode(mode === 'signin' ? 'signup' : 'signin');
+                  setPassword('');
+                  setSelectedRole(null);
+                }}
                 className="ml-1.5 text-[#57068C] dark:text-purple-400 font-semibold hover:underline"
               >
                 {mode === 'signin' ? 'Sign up' : 'Sign in'}

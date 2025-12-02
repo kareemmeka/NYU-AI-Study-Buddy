@@ -1,12 +1,13 @@
 "use client";
 
 import { Button } from '@/components/ui/button';
-import { Moon, Sun, HelpCircle, MessageSquare, Upload, Settings, Sparkles } from 'lucide-react';
+import { Moon, Sun, HelpCircle, MessageSquare, Upload, Settings, Sparkles, BookOpen } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 import { ModelSelector } from './ModelSelector';
 import { UserMenu } from './auth/UserMenu';
 import { User } from '@/types';
+import { getUserRole } from '@/lib/course-management';
 
 interface HeaderProps {
   onFileManagerClick?: () => void;
@@ -35,6 +36,10 @@ export function Header({
 }: HeaderProps) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const role = getUserRole();
+  // Only show role-specific buttons if user is signed in AND has a role selected
+  const isProfessor = user && role === 'professor';
+  const isStudent = user && role === 'student';
 
   useEffect(() => {
     setMounted(true);
@@ -71,15 +76,37 @@ export function Header({
               <MessageSquare className="h-4 w-4 mr-2" />
               Chat
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onFileManagerClick}
-              className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200"
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Upload
-            </Button>
+            {isStudent ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onFileManagerClick}
+                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200"
+              >
+                <BookOpen className="h-4 w-4 mr-2" />
+                Select Course
+              </Button>
+            ) : isProfessor ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onFileManagerClick}
+                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Upload Materials
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onFileManagerClick}
+                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Upload
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"

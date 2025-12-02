@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
     console.log(`[UPLOAD:${requestId}] 📥 Parsing form data...`);
     const formData = await req.formData();
     const files = formData.getAll('files') as File[];
+    const courseId = formData.get('courseId') as string | null;
 
     console.log(`[UPLOAD:${requestId}] ✅ Form data parsed successfully`);
     console.log(`[UPLOAD:${requestId}] 📦 Files received: ${files.length}`);
@@ -99,12 +100,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Upload files
-    console.log(`[UPLOAD:${requestId}] 🚀 Starting file upload to Vercel Blob...`);
+    console.log(`[UPLOAD:${requestId}] 🚀 Starting file upload to Vercel Blob...${courseId ? ` (course: ${courseId})` : ''}`);
     const uploadStart = Date.now();
     const uploadedFiles = await uploadFiles(files);
     const uploadDuration = Date.now() - uploadStart;
     
     console.log(`[UPLOAD:${requestId}] ✅ Successfully uploaded ${uploadedFiles.length} file(s) in ${uploadDuration}ms`);
+    if (courseId) {
+      console.log(`[UPLOAD:${requestId}]   Course ID provided: ${courseId} (association will happen on client)`);
+    }
+    
     uploadedFiles.forEach((file, index) => {
       console.log(`[UPLOAD:${requestId}]   ✓ ${index + 1}/${uploadedFiles.length}: ${file.name}`);
       console.log(`[UPLOAD:${requestId}]     URL: ${file.url}`);

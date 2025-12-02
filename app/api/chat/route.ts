@@ -6,13 +6,19 @@ import { ChatRequest, Message } from '@/types';
 
 const MAX_CONTEXT_LENGTH = 200000; // Increased to include more content
 
-async function loadCourseMaterials(): Promise<{ text: string; fileCount: number; fileNames: string[] }> {
-  console.log('[MATERIALS] Loading ALL course materials...');
+async function loadCourseMaterials(fileIds?: string[]): Promise<{ text: string; fileCount: number; fileNames: string[] }> {
+  console.log('[MATERIALS] Loading course materials...', fileIds ? `(${fileIds.length} specific files)` : '(all files)');
   const startTime = Date.now();
   
   try {
-    const files = await listFiles();
+    let files = await listFiles();
     console.log(`[MATERIALS] Found ${files.length} files in storage`);
+    
+    // Filter files by fileIds if provided
+    if (fileIds && fileIds.length > 0) {
+      files = files.filter(f => fileIds.includes(f.id));
+      console.log(`[MATERIALS] Filtered to ${files.length} file(s) for course`);
+    }
     
     if (files.length === 0) {
       console.log('[MATERIALS] No files found, returning empty message');
@@ -236,7 +242,7 @@ export async function POST(req: NextRequest) {
   
   try {
     const body: ChatRequest = await req.json();
-    const { message, conversationHistory = [], model: requestedModel, user } = body;
+    const { message, conversationHistory = [], model: requestedModel, user, courseId, fileIds } = body;
     
     // Use model from request, or fall back to environment variable, or default
     const modelToUse = requestedModel || AI_MODEL;
@@ -245,6 +251,9 @@ export async function POST(req: NextRequest) {
     console.log(`[CHAT:${requestId}] 💬 History: ${conversationHistory.length} messages`);
     console.log(`[CHAT:${requestId}] 🤖 Model: ${modelToUse}`);
     console.log(`[CHAT:${requestId}] 👤 User: ${user?.name || 'Guest'}`);
+    if (courseId) {
+      console.log(`[CHAT:${requestId}] 📚 Course: ${courseId} (${fileIds?.length || 0} files)`);
+    }
 
     if (!message || message.trim().length === 0) {
       return new Response(JSON.stringify({ error: 'Message is required' }), {
@@ -253,8 +262,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    console.log(`[CHAT:${requestId}] 📚 Loading ALL course materials...`);
-    const { text: allMaterials, fileCount, fileNames } = await loadCourseMaterials();
+    console.log(`[CHAT:${requestId}] 📚 Loading course materials...`);
+    const { text: allMaterials, fileCount, fileNames } = await loadCourseMaterials(fileIds);
     
     const hasMaterials = fileCount > 0 && 
                         allMaterials !== 'No course materials uploaded yet.' &&
@@ -268,64 +277,99 @@ export async function POST(req: NextRequest) {
     // Generate personalized system prompt if user is logged in
     let personalizedPrompt = SYSTEM_PROMPT;
     if (user) {
-      const { name, preferences, memory } = user;
-      personalizedPrompt += `\n\n--- PERSONALIZATION FOR ${name.toUpperCase()} ---\n`;
+      const { name, preferences, memory, role } = user;
       
-      // Academic context
-      personalizedPrompt += `You are speaking with ${name}`;
-      if (preferences.academicLevel) {
-        personalizedPrompt += `, a ${preferences.academicLevel} student`;
+      // Different prompt for professors
+      if (role === 'professor') {
+        personalizedPrompt = `You are NYU AI Study Buddy, an intelligent assistant for NYU Abu Dhabi professors.
+
+Your role:
+- Help professors manage their courses and track student engagement
+- Generate quizzes and practice materials from course content
+- Provide insights about student questions and learning patterns
+- Assist with course material organization and analysis
+- Answer questions about course content for reference
+
+Guidelines:
+- Use information from the provided course materials when available
+- For analytics questions, provide insights based on available data
+- For quiz generation requests, create comprehensive, well-structured questions
+- Be professional, supportive, and focused on helping professors support their students
+- Provide actionable insights about student engagement and learning patterns
+
+Tone: Professional, knowledgeable, and supportive - like an experienced academic advisor.`;
+        
+        personalizedPrompt += `\n\n--- PERSONALIZATION FOR PROFESSOR ${name.toUpperCase()} ---\n`;
+        personalizedPrompt += `You are speaking with Professor ${name}.\n`;
+        personalizedPrompt += '--- END PERSONALIZATION ---\n';
+      } else {
+        // Student personalization
+        personalizedPrompt += `\n\n--- PERSONALIZATION FOR ${name.toUpperCase()} ---\n`;
+        
+        // Academic context
+        personalizedPrompt += `You are speaking with ${name}`;
+        if (preferences?.academicLevel) {
+          personalizedPrompt += `, a ${preferences.academicLevel} student`;
+        }
+        if (preferences?.major) {
+          personalizedPrompt += ` majoring in ${preferences.major}`;
+        }
+        personalizedPrompt += '.\n';
+        
+        // Learning style
+        if (preferences?.learningStyle) {
+          const learningStyles: Record<string, string> = {
+            visual: 'They learn best with diagrams, charts, and visual representations. Include visual descriptions when helpful.',
+            auditory: 'They learn best through verbal explanations. Use conversational language.',
+            reading: 'They learn best through reading and written materials. Provide detailed written explanations.',
+            kinesthetic: 'They learn best through hands-on examples. Include practice problems and real-world applications.',
+          };
+          personalizedPrompt += learningStyles[preferences.learningStyle] + '\n';
+        }
+        
+        // Response style
+        if (preferences?.responseStyle) {
+          const responseStyles: Record<string, string> = {
+            concise: 'Keep responses brief and to the point.',
+            detailed: 'Provide thorough, comprehensive explanations.',
+            'step-by-step': 'Break down explanations into clear, numbered steps.',
+          };
+          personalizedPrompt += responseStyles[preferences.responseStyle] + '\n';
+        }
+        
+        // Tone
+        if (preferences?.tone) {
+          const tones: Record<string, string> = {
+            formal: 'Maintain a professional and formal tone.',
+            casual: 'Use a friendly, conversational tone.',
+            encouraging: 'Be supportive, encouraging, and positive.',
+          };
+          personalizedPrompt += tones[preferences.tone] + '\n';
+        }
+        
+        // Memory context
+        if (memory) {
+          if (memory.topics && memory.topics.length > 0) {
+            const recentTopics = memory.topics.slice(-10);
+            personalizedPrompt += `\nTopics ${name} has recently studied: ${recentTopics.join(', ')}. You can reference these and build upon prior knowledge.\n`;
+          }
+          if (memory.strengths && memory.strengths.length > 0) {
+            personalizedPrompt += `Their strengths: ${memory.strengths.join(', ')}. You can reference these when relevant.\n`;
+          }
+          if (memory.weaknesses && memory.weaknesses.length > 0) {
+            personalizedPrompt += `They need extra help with: ${memory.weaknesses.join(', ')}. Provide more detailed explanations for these topics.\n`;
+          }
+          if (memory.recentQuestions && memory.recentQuestions.length > 0) {
+            const recentQ = memory.recentQuestions.slice(0, 5);
+            personalizedPrompt += `\nRecent questions ${name} asked: ${recentQ.map(q => `"${q.substring(0, 50)}..."`).join('; ')}. Consider this context when answering.\n`;
+          }
+          if (memory.notes) {
+            personalizedPrompt += `\nAdditional notes about the student: ${memory.notes}\n`;
+          }
+        }
+        
+        personalizedPrompt += '--- END PERSONALIZATION ---\n';
       }
-      if (preferences.major) {
-        personalizedPrompt += ` majoring in ${preferences.major}`;
-      }
-      personalizedPrompt += '.\n';
-      
-      // Learning style
-      const learningStyles: Record<string, string> = {
-        visual: 'They learn best with diagrams, charts, and visual representations. Include visual descriptions when helpful.',
-        auditory: 'They learn best through verbal explanations. Use conversational language.',
-        reading: 'They learn best through reading and written materials. Provide detailed written explanations.',
-        kinesthetic: 'They learn best through hands-on examples. Include practice problems and real-world applications.',
-      };
-      personalizedPrompt += learningStyles[preferences.learningStyle] + '\n';
-      
-      // Response style
-      const responseStyles: Record<string, string> = {
-        concise: 'Keep responses brief and to the point.',
-        detailed: 'Provide thorough, comprehensive explanations.',
-        'step-by-step': 'Break down explanations into clear, numbered steps.',
-      };
-      personalizedPrompt += responseStyles[preferences.responseStyle] + '\n';
-      
-      // Tone
-      const tones: Record<string, string> = {
-        formal: 'Maintain a professional and formal tone.',
-        casual: 'Use a friendly, conversational tone.',
-        encouraging: 'Be supportive, encouraging, and positive.',
-      };
-      personalizedPrompt += tones[preferences.tone] + '\n';
-      
-      // Memory context
-      if (memory.topics && memory.topics.length > 0) {
-        const recentTopics = memory.topics.slice(-10);
-        personalizedPrompt += `\nTopics ${name} has recently studied: ${recentTopics.join(', ')}. You can reference these and build upon prior knowledge.\n`;
-      }
-      if (memory.strengths && memory.strengths.length > 0) {
-        personalizedPrompt += `Their strengths: ${memory.strengths.join(', ')}. You can reference these when relevant.\n`;
-      }
-      if (memory.weaknesses && memory.weaknesses.length > 0) {
-        personalizedPrompt += `They need extra help with: ${memory.weaknesses.join(', ')}. Provide more detailed explanations for these topics.\n`;
-      }
-      if (memory.recentQuestions && memory.recentQuestions.length > 0) {
-        const recentQ = memory.recentQuestions.slice(0, 5);
-        personalizedPrompt += `\nRecent questions ${name} asked: ${recentQ.map(q => `"${q.substring(0, 50)}..."`).join('; ')}. Consider this context when answering.\n`;
-      }
-      if (memory.notes) {
-        personalizedPrompt += `\nAdditional notes about the student: ${memory.notes}\n`;
-      }
-      
-      personalizedPrompt += '--- END PERSONALIZATION ---\n';
     }
     
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
@@ -339,8 +383,30 @@ export async function POST(req: NextRequest) {
 
     let userMessageContent: string;
     
+    const isProfessor = user?.role === 'professor';
+    
     if (hasMaterials) {
-      userMessageContent = `
+      if (isProfessor) {
+        userMessageContent = `
+=== AVAILABLE COURSE MATERIALS (${fileCount} files) ===
+Files loaded: ${fileNames.join(', ')}
+
+${context}
+
+=== END OF COURSE MATERIALS ===
+
+Professor Question: ${message}
+
+INSTRUCTIONS: 
+1. Search through ALL the course materials above to find relevant information
+2. The materials include ${fileCount} files: ${fileNames.join(', ')}
+3. If the question is about student engagement, analytics, or quiz generation, provide helpful insights
+4. If the answer is found in the course materials, provide a complete response with citations
+5. If you cannot find the specific information after checking all files, let the professor know and suggest alternatives
+6. For quiz generation requests, create comprehensive questions based on the materials
+7. For analytics questions, provide insights about student learning patterns`;
+      } else {
+        userMessageContent = `
 === AVAILABLE COURSE MATERIALS (${fileCount} files) ===
 Files loaded: ${fileNames.join(', ')}
 
@@ -350,13 +416,16 @@ ${context}
 
 Student Question: ${message}
 
-Instructions: 
+CRITICAL INSTRUCTIONS: 
 1. Search through ALL the course materials above to find relevant information
 2. The materials include ${fileCount} files: ${fileNames.join(', ')}
-3. If the answer is found, provide a complete response with citations (mention which file the information came from)
-4. If you cannot find the specific information after checking all files, let the student know and suggest they upload the relevant materials`;
+3. If the answer is found in the course materials, provide a complete response with citations (mention which file the information came from)
+4. If you cannot find the specific information after checking all files, you MUST ONLY respond with: "I don't find that information in the uploaded course materials. Please check your syllabus or consult your professor."
+5. DO NOT provide any answer, explanation, or general knowledge if the information is not in the course materials above
+6. DO NOT use your general knowledge to answer questions not covered in the uploaded materials`;
+      }
     } else {
-      userMessageContent = `Note: ${allMaterials}\n\nStudent Question: ${message}\n\nPlease inform the user that no course materials are available and they need to upload materials first.`;
+      userMessageContent = `Note: ${allMaterials}\n\nStudent Question: ${message}\n\nCRITICAL: You MUST ONLY respond with: "No course materials are available. Please upload course materials first." DO NOT provide any answer or explanation to the question.`;
     }
     messages.push({ role: 'user', content: userMessageContent });
 

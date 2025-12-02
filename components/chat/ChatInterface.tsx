@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Message as MessageType, ChatSession, User } from '@/types';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
@@ -14,6 +14,7 @@ import {
 } from '@/lib/chat-history';
 import { getSelectedModel } from '@/lib/models';
 import { addRecentQuestion, addStudiedTopic, learnFromConversation } from '@/lib/user-auth';
+import { getSelectedCourseId, getCourseFiles } from '@/lib/course-management';
 
 interface ChatInterfaceProps {
   sessionId?: string | null;
@@ -28,6 +29,7 @@ export function ChatInterface({ sessionId, onSessionChange, selectedModel, onMod
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<MessageType[]>([]);
+  const messagesRef = useRef<MessageType[]>([]); // Ref to track current messages for saving
   
   // Get the current model (from prop or localStorage)
   const getCurrentModel = useCallback(() => {
@@ -50,6 +52,7 @@ export function ChatInterface({ sessionId, onSessionChange, selectedModel, onMod
     if (session) {
       setCurrentSessionId(id);
       setMessages(session.messages);
+      messagesRef.current = session.messages;
       setConversationHistory(session.messages);
     }
   };
@@ -58,6 +61,7 @@ export function ChatInterface({ sessionId, onSessionChange, selectedModel, onMod
     // Clear messages but don't create a session yet
     setCurrentSessionId(null);
     setMessages([]);
+    messagesRef.current = [];
     setConversationHistory([]);
   };
 
@@ -75,6 +79,16 @@ export function ChatInterface({ sessionId, onSessionChange, selectedModel, onMod
   const handleSend = useCallback(async (message: string) => {
     if (!message.trim()) return;
 
+    // Block chat if user is not signed in
+    if (!user) {
+      toast({
+        title: 'Sign In Required',
+        description: 'Please sign in to use the chat feature',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     // Create session on first message (like ChatGPT)
     const activeSessionId = createSessionIfNeeded();
 
@@ -85,7 +99,11 @@ export function ChatInterface({ sessionId, onSessionChange, selectedModel, onMod
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages((prev) => {
+      const updated = [...prev, userMessage];
+      messagesRef.current = updated;
+      return updated;
+    });
     setConversationHistory((prev) => [...prev, userMessage]);
     setIsTyping(true);
 
@@ -106,6 +124,23 @@ export function ChatInterface({ sessionId, onSessionChange, selectedModel, onMod
         }
       }
       
+      // Get course file IDs if a course is selected
+      const courseId = getSelectedCourseId();
+      const fileIds = courseId ? getCourseFiles(courseId).map(cf => cf.fileId) : undefined;
+      
+      // Track question for analytics (if course is selected)
+      if (courseId) {
+        // Import and track asynchronously to not block the main flow
+        import('@/lib/analytics').then(({ trackQuestion }) => {
+          import('@/lib/course-management').then(({ getCourse }) => {
+            const course = getCourse(courseId);
+            if (course) {
+              trackQuestion(message, courseId, course.name, activeSessionId, user?.id);
+            }
+          });
+        });
+      }
+      
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -115,10 +150,13 @@ export function ChatInterface({ sessionId, onSessionChange, selectedModel, onMod
           message,
           conversationHistory: conversationHistory.slice(-10),
           model: currentModel,
+          courseId: courseId || undefined,
+          fileIds: fileIds,
           user: user ? {
             name: user.name,
             preferences: user.preferences,
             memory: user.memory,
+            role: user.role,
           } : null,
         }),
       });
@@ -171,9 +209,10 @@ export function ChatInterface({ sessionId, onSessionChange, selectedModel, onMod
                 }
                 
                 // Save session after message completes with AI-generated title
+                // Use ref to get latest messages to avoid stale closure
                 setTimeout(async () => {
                   if (activeSessionId) {
-                    const finalMessages = [...messages, userMessage, assistantMessage];
+                    const finalMessages = messagesRef.current;
                     const title = await generateChatTitle(finalMessages);
                     const session: ChatSession = {
                       id: activeSessionId,
@@ -199,6 +238,7 @@ export function ChatInterface({ sessionId, onSessionChange, selectedModel, onMod
                   setMessages((prev) => {
                     const updated = [...prev];
                     updated[updated.length - 1] = { ...assistantMessage };
+                    messagesRef.current = updated;
                     return updated;
                   });
                   // Trigger scroll after content update - multiple attempts
@@ -230,9 +270,10 @@ export function ChatInterface({ sessionId, onSessionChange, selectedModel, onMod
       setIsTyping(false);
       setConversationHistory((prev) => [...prev, assistantMessage]);
       // Save session after message completes with AI-generated title
+      // Use ref to get latest messages to avoid stale closure
       setTimeout(async () => {
         if (activeSessionId) {
-          const finalMessages = [...messages, userMessage, assistantMessage];
+          const finalMessages = messagesRef.current;
           const title = await generateChatTitle(finalMessages);
           const session: ChatSession = {
             id: activeSessionId,
@@ -265,7 +306,11 @@ export function ChatInterface({ sessionId, onSessionChange, selectedModel, onMod
         content: `Sorry, I encountered an error: ${errorMessage}. Please try again.`,
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, errorMsg]);
+      setMessages((prev) => {
+        const updated = [...prev, errorMsg];
+        messagesRef.current = updated;
+        return updated;
+      });
     }
   }, [conversationHistory, getCurrentModel, messages, user, currentSessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -285,6 +330,7 @@ export function ChatInterface({ sessionId, onSessionChange, selectedModel, onMod
 
   const handleClear = () => {
     setMessages([]);
+    messagesRef.current = [];
     setConversationHistory([]);
     // Save empty session
     if (currentSessionId) {
@@ -303,12 +349,17 @@ export function ChatInterface({ sessionId, onSessionChange, selectedModel, onMod
   useEffect(() => {
     if (!currentSessionId || messages.length === 0) return;
     
+    // Update ref whenever messages change
+    messagesRef.current = messages;
+    
     const timeoutId = setTimeout(async () => {
-      const title = await generateChatTitle(messages);
+      // Use ref to get latest messages
+      const currentMessages = messagesRef.current;
+      const title = await generateChatTitle(currentMessages);
       const session: ChatSession = {
         id: currentSessionId,
         title: title,
-        messages: messages,
+        messages: currentMessages,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -323,7 +374,17 @@ export function ChatInterface({ sessionId, onSessionChange, selectedModel, onMod
       <div className="flex-1 min-h-0 overflow-hidden" style={{ minHeight: 0, height: '100%' }}>
         <MessageList messages={messages} isTyping={isTyping} user={user} />
       </div>
-      <MessageInput onSend={handleSend} disabled={isTyping} onModelChange={onModelChange} />
+      <MessageInput 
+        onSend={handleSend} 
+        disabled={isTyping} 
+        onModelChange={onModelChange}
+        onSignInClick={() => {
+          // Trigger sign in modal
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('open-auth-modal'));
+          }
+        }}
+      />
     </div>
   );
 }

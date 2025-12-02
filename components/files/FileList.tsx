@@ -9,12 +9,15 @@ import { toast } from '@/components/ui/toast';
 import { formatFileSize } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { getUserRole } from '@/lib/course-management';
 
 interface FileListProps {
   onFilesChange?: () => void;
+  courseId?: string;
 }
 
-export function FileList({ onFilesChange }: FileListProps) {
+export function FileList({ onFilesChange, courseId }: FileListProps) {
+  const userRole = getUserRole();
   const [files, setFiles] = useState<FileMetadata[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -23,8 +26,20 @@ export function FileList({ onFilesChange }: FileListProps) {
   const loadFiles = async () => {
     try {
       setLoading(true);
-      console.log('[FileList] Loading files...');
-      const response = await fetch('/api/files');
+      console.log('[FileList] Loading files...', courseId ? `(course: ${courseId})` : '');
+      
+      // Get file IDs for the course if courseId is provided
+      let url = '/api/files';
+      if (courseId) {
+        const { getCourseFiles } = await import('@/lib/course-management');
+        const courseFiles = getCourseFiles(courseId);
+        const fileIds = courseFiles.map(cf => cf.fileId);
+        if (fileIds.length > 0) {
+          url = `/api/files?fileIds=${fileIds.join(',')}`;
+        }
+      }
+      
+      const response = await fetch(url);
       
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
@@ -56,7 +71,7 @@ export function FileList({ onFilesChange }: FileListProps) {
 
   useEffect(() => {
     loadFiles();
-  }, []);
+  }, [courseId]); // Reload when courseId changes
 
   const handleDeleteRequest = (fileId: string, fileUrl?: string) => {
     const file = files.find(f => f.id === fileId);
@@ -131,10 +146,15 @@ export function FileList({ onFilesChange }: FileListProps) {
         </p>
       </div>
 
-      <FileUpload onUploadComplete={() => {
-        loadFiles();
-        onFilesChange?.();
-      }} />
+      {userRole === 'professor' && (
+        <FileUpload 
+          courseId={courseId}
+          onUploadComplete={() => {
+            loadFiles();
+            onFilesChange?.();
+          }} 
+        />
+      )}
 
       {/* Quick Action: Go to Chat */}
       {files.length > 0 && (

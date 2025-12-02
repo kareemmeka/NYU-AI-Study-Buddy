@@ -5,10 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { X, Save, Trash2, Brain, GraduationCap, MessageSquare, LogOut, Zap } from 'lucide-react';
-import { User, UserPreferences, UserMemory } from '@/types';
+import { User, UserPreferences, UserMemory, UserRole } from '@/types';
 import { updatePreferences, updateMemory, updateName, deleteAccount, signOut } from '@/lib/user-auth';
 import { toast } from '@/components/ui/toast';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { getUserRole } from '@/lib/course-management';
+import { ProfessorTools } from '@/components/professor/ProfessorTools';
 
 interface UserProfileProps {
   isOpen: boolean;
@@ -18,7 +20,9 @@ interface UserProfileProps {
 }
 
 export function UserProfile({ isOpen, onClose, user, onUserUpdate }: UserProfileProps) {
-  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'memory'>('profile');
+  const userRole = getUserRole();
+  const isProfessor = userRole === 'professor';
+  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'memory' | 'tools'>('profile');
   const [name, setName] = useState(user.name);
   const [preferences, setPreferences] = useState<UserPreferences>(user.preferences);
   const [memory, setMemory] = useState<UserMemory>(user.memory);
@@ -99,6 +103,7 @@ export function UserProfile({ isOpen, onClose, user, onUserUpdate }: UserProfile
     { id: 'profile', icon: GraduationCap, label: 'Profile' },
     { id: 'preferences', icon: MessageSquare, label: 'AI Style' },
     { id: 'memory', icon: Brain, label: 'Memory' },
+    ...(isProfessor ? [{ id: 'tools', icon: Zap, label: 'Professor Tools' }] : []),
   ];
 
   return (
@@ -359,6 +364,13 @@ export function UserProfile({ isOpen, onClose, user, onUserUpdate }: UserProfile
                   <Save className="h-4 w-4 mr-2" />
                   Save Memory
                 </Button>
+              </div>
+            )}
+
+            {/* Professor Tools Tab */}
+            {activeTab === 'tools' && isProfessor && (
+              <div className="max-h-[calc(85vh-250px)] overflow-y-auto">
+                <ProfessorTools />
               </div>
             )}
           </div>
