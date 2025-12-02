@@ -149,24 +149,25 @@ export function HelpContent({ onGetStarted, onStartChat, onViewAnalytics }: Help
           </div>
         </div>
 
-        {/* CTA */}
-        <div className="flex gap-4 pt-4">
-          <Button 
-            onClick={onGetStarted}
-            className="flex-1 h-12 bg-[#57068C] hover:bg-[#6A0BA8] text-white rounded-xl shadow-lg shadow-purple-500/20"
-          >
-            <BookOpen className="h-4 w-4 mr-2" />
-            Select Course
-          </Button>
-          <Button 
-            onClick={onStartChat}
-            variant="outline"
-            className="flex-1 h-12 rounded-xl border-2"
-          >
-            <MessageSquare className="h-4 w-4 mr-2" />
-            Start Chatting
-          </Button>
-        </div>
+      {/* CTA */}
+      <div className="flex gap-4 pt-4">
+        <Button 
+          onClick={onGetStarted}
+          className="flex-1 h-12 bg-[#57068C] hover:bg-[#6A0BA8] text-white rounded-xl shadow-lg shadow-purple-500/20"
+        >
+          <BookOpen className="h-4 w-4 mr-2" />
+          Select Course
+        </Button>
+        <Button 
+          onClick={onStartChat}
+          variant="outline"
+          className="flex-1 h-12 rounded-xl border-2"
+        >
+          <MessageSquare className="h-4 w-4 mr-2" />
+          Start Chatting
+        </Button>
+        {/* No View Analytics button for students */}
+      </div>
       </div>
     );
   }
@@ -293,15 +294,16 @@ export function HelpContent({ onGetStarted, onStartChat, onViewAnalytics }: Help
           </div>
         </div>
 
-        {/* CTA */}
-        <div className="flex gap-4 pt-4">
-          <Button 
-            onClick={onGetStarted}
-            className="flex-1 h-12 bg-[#57068C] hover:bg-[#6A0BA8] text-white rounded-xl shadow-lg shadow-purple-500/20"
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            Create Course
-          </Button>
+      {/* CTA */}
+      <div className="flex gap-4 pt-4">
+        <Button 
+          onClick={onGetStarted}
+          className="flex-1 h-12 bg-[#57068C] hover:bg-[#6A0BA8] text-white rounded-xl shadow-lg shadow-purple-500/20"
+        >
+          <Upload className="h-4 w-4 mr-2" />
+          Create Course
+        </Button>
+        {onViewAnalytics && (
           <Button 
             onClick={onViewAnalytics}
             variant="outline"
@@ -310,7 +312,8 @@ export function HelpContent({ onGetStarted, onStartChat, onViewAnalytics }: Help
             <BarChart3 className="h-4 w-4 mr-2" />
             View Analytics
           </Button>
-        </div>
+        )}
+      </div>
       </div>
     );
   }

@@ -388,15 +388,7 @@ export default function Home() {
                     handleCloseModal();
                     handleGoToChat();
                   }}
-                  onViewAnalytics={() => {
-                    const currentRole = getUserRole();
-                    if (!currentRole || currentRole !== 'professor') {
-                      toast({
-                        title: 'Professor Access Only',
-                        description: 'Analytics are only available for professors',
-                      });
-                      return;
-                    }
+                  onViewAnalytics={userRole === 'professor' ? () => {
                     if (!user) {
                       handleCloseModal();
                       setShowAuthModal(true);
@@ -404,7 +396,7 @@ export default function Home() {
                     }
                     handleCloseModal();
                     handleOpenAnalytics();
-                  }}
+                  } : undefined}
                 />
               </div>
             </Card>

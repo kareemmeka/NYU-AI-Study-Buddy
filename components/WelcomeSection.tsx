@@ -60,6 +60,7 @@ export function WelcomeSection({ onGetStarted, onViewAnalytics }: WelcomeSection
               <MessageSquare className="h-5 w-5 mr-2" />
               Start Chatting
             </Button>
+            {/* No analytics button for students - this is student welcome section */}
           </div>
         </div>
 
